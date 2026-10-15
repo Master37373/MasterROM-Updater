@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Glass lens with an "M" whose middle runs into a download arrow -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#2EFFFFFF"
+        android:strokeColor="#99FFFFFF"
+        android:strokeWidth="1.2"
+        android:pathData="M54,32a22,22 0,1 1,0 44a22,22 0,1 1,0 -44z" />
+    <group
+        android:pivotX="12"
+        android:pivotY="13"
+        android:scaleX="1.45"
+        android:scaleY="1.45"
+        android:translateX="42"
+        android:translateY="41">
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="2.2"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M5,16.5V6.5l7,7.5 7,-7.5v10M12,14v5.5M9.5,17.2 L12,19.7l2.5,-2.5" />
+    </group>
+</vector>

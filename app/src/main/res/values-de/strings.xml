@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MasterROM Updater</string>
+    <string name="title_software_update">Software-Update</string>
+    <string name="checking">Suche nach Updates …</string>
+    <string name="up_to_date">Dein System ist aktuell</string>
+    <string name="update_available">Update verfügbar</string>
+    <string name="check_failed">Suche nach Updates fehlgeschlagen</string>
+    <string name="installed_version">Installiert: %1$s</string>
+    <string name="rom_and_device">%1$s · %2$s</string>
+    <string name="last_checked">Zuletzt geprüft: %1$s</string>
+    <string name="never_checked">Noch nicht geprüft</string>
+    <string name="check_now">Nach Updates suchen</string>
+    <string name="try_again">Erneut versuchen</string>
+    <string name="download">Herunterladen</string>
+    <string name="download_next_stage">Herunterladen kommt mit der nächsten App-Version.</string>
+    <string name="chip_clean_flash">Format Data nötig</string>
+    <string name="chip_dirty_flash">Ohne Format Data</string>
+    <string name="kernel_update_available">Kernel-Update verfügbar</string>
+    <string name="section_device">Dieses Gerät</string>
+    <string name="row_rom_version">ROM-Version</string>
+    <string name="row_kernel">Kernel</string>
+    <string name="row_device">Gerät</string>
+    <string name="unknown">Unbekannt</string>
+    <string name="error_network">Keine Verbindung zum Update-Server.</string>
+    <string name="error_no_device">Keine Update-Infos für dieses Gerät (%1$s).</string>
+</resources>
