@@ -258,9 +258,18 @@ fun InfoRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(label, color = g.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
-            // the value never wraps (a time like "02:00" must stay on one line)
-            Text(value, color = g.subText, fontSize = 15.sp, maxLines = 1, softWrap = false, modifier = Modifier.padding(start = 16.dp))
+            // the label keeps its full width (never broken inside a word); the value takes the rest
+            // on one line and is shortened with "…" when it does not fit (e.g. "02:00", long sources)
+            Text(label, color = g.text, fontSize = 16.sp, maxLines = 1)
+            Text(
+                value,
+                color = g.subText,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                modifier = Modifier.weight(1f, fill = false).padding(start = 16.dp),
+            )
         }
     }
 }
