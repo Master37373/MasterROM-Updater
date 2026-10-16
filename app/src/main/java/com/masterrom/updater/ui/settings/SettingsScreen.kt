@@ -38,6 +38,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.masterrom.updater.BuildConfig
 import com.masterrom.updater.R
@@ -51,7 +53,6 @@ import com.masterrom.updater.ui.glass.LargeTitle
 import com.masterrom.updater.ui.glass.SecondaryButton
 import com.masterrom.updater.ui.glass.SectionLabel
 import com.masterrom.updater.ui.home.HomeViewModel
-import com.masterrom.updater.ui.home.SwitchRow
 import com.masterrom.updater.ui.theme.LocalGlass
 
 @Composable
@@ -85,26 +86,26 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenChangelog: () ->
     ) {
 
             SectionLabel(stringResource(R.string.settings_download))
-            GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 14.dp)) {
+            GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 4.dp)) {
                 SwitchRow(
                     title = stringResource(R.string.auto_check),
                     summary = stringResource(R.string.auto_check_desc),
                     checked = autoCheck,
                     onChange = vm::setAutoCheck,
+                    divider = false,
                 )
-                Spacer(Modifier.height(16.dp))
                 SwitchRow(
                     title = stringResource(R.string.auto_download),
                     summary = stringResource(R.string.auto_download_desc),
                     checked = autoDownload,
                     onChange = vm::setAutoDownload,
                 )
-                Spacer(Modifier.height(16.dp))
+                // shown the other way round: "use mobile data" is easier to read than "Wi-Fi only"
                 SwitchRow(
-                    title = stringResource(R.string.wifi_only),
-                    summary = stringResource(R.string.wifi_only_desc),
-                    checked = wifiOnly,
-                    onChange = vm::setWifiOnly,
+                    title = stringResource(R.string.mobile_data),
+                    summary = stringResource(R.string.mobile_data_desc),
+                    checked = !wifiOnly,
+                    onChange = { vm.setWifiOnly(!it) },
                 )
             }
 
@@ -147,6 +148,7 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenChangelog: () ->
                             summary = stringResource(R.string.test_mode_desc),
                             checked = testMode,
                             onChange = vm::setTestMode,
+                            divider = false,
                         )
                         Spacer(Modifier.height(12.dp))
                         SecondaryButton(
@@ -241,10 +243,22 @@ private fun LocalZipCard(
     GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 16.dp)) {
         when (state) {
             com.masterrom.updater.ui.home.LocalZipState.Idle -> {
-                Text(stringResource(R.string.local_title), color = g.text, fontSize = 16.sp)
-                Text(stringResource(R.string.local_desc), color = g.subText, fontSize = 13.sp, lineHeight = 18.sp)
-                Spacer(Modifier.height(12.dp))
-                SecondaryButton(stringResource(R.string.local_pick), onClick = onPick, modifier = Modifier.fillMaxWidth(), height = 44.dp)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null,
+                            onClick = onPick,
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.local_title), color = g.text, fontSize = 16.sp)
+                        Text(stringResource(R.string.local_desc), color = g.subText, fontSize = 13.sp, lineHeight = 18.sp)
+                    }
+                    Text("›", color = g.subText, fontSize = 22.sp, modifier = Modifier.padding(start = 12.dp))
+                }
             }
             is com.masterrom.updater.ui.home.LocalZipState.Copying -> {
                 Text(state.name, color = g.text, fontSize = 16.sp, maxLines = 2)
@@ -370,4 +384,43 @@ private fun localAgeText(c: com.masterrom.updater.install.LocalZip.Check): Strin
         c.installed,
     )
     com.masterrom.updater.install.LocalZip.Age.UNKNOWN -> null
+}
+
+/** Settings row with a switch; tapping the whole row toggles it. A divider separates it from the row above. */
+@Composable
+private fun SwitchRow(title: String, summary: String, checked: Boolean, onChange: (Boolean) -> Unit, divider: Boolean = true) {
+    val g = LocalGlass.current
+    Column {
+        if (divider) androidx.compose.foundation.layout.Box(
+            Modifier.fillMaxWidth().height(1.dp).background(g.divider),
+        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                ) { onChange(!checked) }
+                .padding(vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, color = g.text, fontSize = 16.sp)
+                Text(summary, color = g.subText, fontSize = 13.sp, lineHeight = 18.sp)
+            }
+            Spacer(Modifier.width(12.dp))
+            androidx.compose.material3.Switch(
+                checked = checked,
+                onCheckedChange = onChange,
+                colors = androidx.compose.material3.SwitchDefaults.colors(
+                    checkedThumbColor = androidx.compose.ui.graphics.Color.White,
+                    checkedTrackColor = g.accent,
+                    checkedBorderColor = g.accent,
+                    uncheckedThumbColor = androidx.compose.ui.graphics.Color.White,
+                    uncheckedTrackColor = g.subText.copy(alpha = 0.35f),
+                    uncheckedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                ),
+            )
+        }
+    }
 }

@@ -66,7 +66,7 @@
     <string name="test_mode_off">Testmodus aus</string>
     <string name="chip_test">Testmodus</string>
     <string name="back">Zurück</string>
-    <string name="settings_download">Download</string>
+    <string name="settings_download">Updates</string>
     <string name="settings_storage">Speicher</string>
     <string name="settings_developer">Entwickler</string>
     <string name="settings_about">Info</string>
@@ -102,8 +102,8 @@
     <string name="whats_new">Was ist neu</string>
     <string name="show_all">Alle anzeigen</string>
     <string name="show_less">Weniger anzeigen</string>
-    <string name="auto_check">Automatisch nach Updates suchen</string>
-    <string name="auto_check_desc">Einmal täglich, mit Benachrichtigung, wenn ein Update da ist.</string>
+    <string name="auto_check">Automatisch suchen</string>
+    <string name="auto_check_desc">Einmal täglich, mit Benachrichtigung</string>
     <string name="app_changelog">Updater-Änderungen</string>
     <string name="version_x">Version %1$s</string>
     <string name="installed_chip">Installiert</string>
@@ -139,11 +139,11 @@
     <string name="night_planned">Wird heute Nacht um %1$s installiert</string>
     <string name="night_cancel">Nächtliche Installation abbrechen</string>
     <string name="night_install">Heute Nacht installieren (%1$s)</string>
-    <string name="auto_download">Automatisch über WLAN herunterladen</string>
-    <string name="auto_download_desc">Neue MasterROM-Versionen werden von selbst heruntergeladen, wenn das Handy im WLAN ist.</string>
+    <string name="auto_download">Automatisch herunterladen</string>
+    <string name="auto_download_desc">Neue Versionen im WLAN laden</string>
     <string name="settings_manual">Manuell installieren</string>
-    <string name="local_title">ZIP installieren</string>
-    <string name="local_desc">Eine ROM-, Kernel- oder andere TWRP-ZIP aus deinem Speicher, installiert wie ein Update (ohne Root).</string>
+    <string name="local_title">ZIP-Datei installieren</string>
+    <string name="local_desc">ROM, Kernel oder andere TWRP-ZIP</string>
     <string name="local_pick">ZIP-Datei auswählen</string>
     <string name="local_copying">Datei wird vorbereitet… %1$d%%</string>
     <string name="local_checked">installierbare ZIP</string>
@@ -166,4 +166,6 @@
     <string name="local_age_older">Älter als die installierte Version (%1$s).</string>
     <string name="local_age_older_rom">Älter als die installierte Version (%1$s). Ein Wechsel auf eine ältere ROM kann Probleme machen und Format Data nötig machen.</string>
     <string name="local_err_device">Diese ZIP ist nicht für dieses Handy.</string>
+    <string name="mobile_data">Mobile Daten verwenden</string>
+    <string name="mobile_data_desc">Downloads auch ohne WLAN (mehrere GB)</string>
 </resources>

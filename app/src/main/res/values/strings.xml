@@ -66,7 +66,7 @@
     <string name="test_mode_off">Test mode off</string>
     <string name="chip_test">Test mode</string>
     <string name="back">Back</string>
-    <string name="settings_download">Download</string>
+    <string name="settings_download">Updates</string>
     <string name="settings_storage">Storage</string>
     <string name="settings_developer">Developer</string>
     <string name="settings_about">About</string>
@@ -102,8 +102,8 @@
     <string name="whats_new">What\'s new</string>
     <string name="show_all">Show all</string>
     <string name="show_less">Show less</string>
-    <string name="auto_check">Check for updates automatically</string>
-    <string name="auto_check_desc">Once a day, with a notification when an update is available.</string>
+    <string name="auto_check">Check automatically</string>
+    <string name="auto_check_desc">Once a day, with a notification</string>
     <string name="app_changelog">Updater changelog</string>
     <string name="version_x">Version %1$s</string>
     <string name="installed_chip">Installed</string>
@@ -139,11 +139,11 @@
     <string name="night_planned">Installs tonight at %1$s</string>
     <string name="night_cancel">Cancel the night install</string>
     <string name="night_install">Install tonight (%1$s)</string>
-    <string name="auto_download">Download automatically over Wi-Fi</string>
-    <string name="auto_download_desc">New MasterROM versions are downloaded by themselves when the phone is on Wi-Fi.</string>
+    <string name="auto_download">Download automatically</string>
+    <string name="auto_download_desc">New versions are loaded over Wi-Fi</string>
     <string name="settings_manual">Install manually</string>
-    <string name="local_title">Install a ZIP</string>
-    <string name="local_desc">A ROM, kernel or other TWRP ZIP from your storage, installed the same way as an update (no root needed).</string>
+    <string name="local_title">Install a ZIP file</string>
+    <string name="local_desc">ROM, kernel or another TWRP ZIP</string>
     <string name="local_pick">Choose ZIP file</string>
     <string name="local_copying">Preparing the file… %1$d%%</string>
     <string name="local_checked">flashable ZIP</string>
@@ -166,4 +166,6 @@
     <string name="local_age_older">Older than the installed version (%1$s).</string>
     <string name="local_age_older_rom">Older than the installed version (%1$s). Going back to an older ROM can cause problems and may need Format Data.</string>
     <string name="local_err_device">This ZIP is not for this phone.</string>
+    <string name="mobile_data">Use mobile data</string>
+    <string name="mobile_data_desc">Downloads also without Wi-Fi (several GB)</string>
 </resources>

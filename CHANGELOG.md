@@ -1,3 +1,6 @@
+# 1.1.1
+- Clearer settings: short texts, rows with dividers, tap anywhere on a row to switch it; "Wi-Fi only" is now "Use mobile data"
+
 # 1.1.0
 - Download automatically over Wi-Fi: new MasterROM versions are downloaded by themselves (Settings)
 - Install tonight: a downloaded update can be installed at 2:00 at night, also when the app is closed (skipped when the battery is below 30 % and not charging)
