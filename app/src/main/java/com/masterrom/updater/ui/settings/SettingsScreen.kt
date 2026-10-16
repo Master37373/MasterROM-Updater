@@ -68,6 +68,7 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenChangelog: () ->
     val devUnlocked by vm.devUnlocked.collectAsStateWithLifecycle()
     val autoDownload by vm.autoDownload.collectAsStateWithLifecycle()
     val nightMinutes by vm.nightMinutes.collectAsStateWithLifecycle()
+    var pickTime by remember { mutableStateOf(false) }
     val localZip by vm.localZip.collectAsStateWithLifecycle()
     var confirmLocal by remember { mutableStateOf(false) }
     val pickZip = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -119,15 +120,7 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenChangelog: () ->
                     stringResource(R.string.night_time),
                     nightLabel,
                     divider = true,
-                    onClick = {
-                        android.app.TimePickerDialog(
-                            context,
-                            { _, h, m -> vm.setNightMinutes(h * 60 + m) },
-                            nightMinutes / 60,
-                            nightMinutes % 60,
-                            android.text.format.DateFormat.is24HourFormat(context),
-                        ).show()
-                    },
+                    onClick = { pickTime = true },
                 )
             }
 
@@ -218,6 +211,17 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenChangelog: () ->
                 InfoRow(stringResource(R.string.update_source), UpdateRepository.REPO, divider = true)
                 InfoRow(stringResource(R.string.row_device), device.codename.ifEmpty { "–" }, divider = true)
             }
+    }
+
+    if (pickTime) {
+        com.masterrom.updater.ui.glass.TimeWheelDialog(
+            title = stringResource(R.string.night_time),
+            minutes = nightMinutes,
+            cancelText = stringResource(R.string.cancel_no),
+            okText = stringResource(R.string.ok),
+            onDismiss = { pickTime = false },
+            onConfirm = { vm.setNightMinutes(it); pickTime = false },
+        )
     }
 
     if (confirmLocal) {

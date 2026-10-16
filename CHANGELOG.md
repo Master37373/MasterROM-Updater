@@ -1,3 +1,8 @@
+# 1.2.1
+- Time of the night install: iOS-style scroll wheels instead of the clock
+- The time no longer breaks into two lines
+- "This device" shows ROM, kernel and device again (system, security patch and build number removed)
+
 # 1.2.0
 - "Looking for something else?": link back to the MasterROM settings
 - More about this device: One UI and Android version, security patch, build number

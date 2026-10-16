@@ -258,8 +258,9 @@ fun InfoRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(label, color = g.text, fontSize = 16.sp)
-            Text(value, color = g.subText, fontSize = 15.sp, modifier = Modifier.padding(start = 16.dp))
+            Text(label, color = g.text, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            // the value never wraps (a time like "02:00" must stay on one line)
+            Text(value, color = g.subText, fontSize = 15.sp, maxLines = 1, softWrap = false, modifier = Modifier.padding(start = 16.dp))
         }
     }
 }

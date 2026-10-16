@@ -252,10 +252,6 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {},
                 )
                 InfoRow(stringResource(R.string.row_kernel), DeviceInfo.shortKernel(device.kernel).ifEmpty { unknown }, divider = true)
                 InfoRow(stringResource(R.string.row_device), device.model + if (device.codename.isNotEmpty()) " (${device.codename})" else "", divider = true)
-                val system = listOf(DeviceInfo.oneUi, "Android " + DeviceInfo.android).filter { it.isNotBlank() }.joinToString(" · ")
-                InfoRow(stringResource(R.string.row_system), system, divider = true)
-                InfoRow(stringResource(R.string.row_patch), patchDate(DeviceInfo.securityPatch).ifEmpty { unknown }, divider = true)
-                InfoRow(stringResource(R.string.row_build), DeviceInfo.buildNumber.ifEmpty { unknown }, divider = true)
             }
 
             // like Samsung's "Looking for something else?": the way back to the MasterROM settings
@@ -770,14 +766,6 @@ private fun PostUpdateCard(
             PrimaryButton(stringResource(R.string.ok), onClick = onDismiss, modifier = Modifier.weight(1f), height = 46.dp)
         }
     }
-}
-
-/** "2026-10-01" -> "1. Oktober 2026" in the phone's language. */
-private fun patchDate(patch: String): String = try {
-    val d = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(patch)
-    if (d == null) patch else java.text.DateFormat.getDateInstance(java.text.DateFormat.LONG).format(d)
-} catch (e: Exception) {
-    patch
 }
 
 /** Opens Settings > MasterROM (an exported activity added by the ROM's settings mod); falls back to Settings. */

@@ -170,7 +170,7 @@
     <string name="mobile_data_desc">Downloads also without Wi-Fi (several GB)</string>
     <string name="notif_paused">MasterROM %1$s paused</string>
     <string name="notif_waiting_wifi">MasterROM %1$s is waiting for Wi-Fi</string>
-    <string name="night_time">Time of the night install</string>
+    <string name="night_time">Night install</string>
     <string name="post_local_title">ZIP installed: %1$s</string>
     <string name="post_local_unknown_text">The phone was restarted after the install. The updater cannot check for this ZIP whether it worked.</string>
     <string name="post_failed_local_text">The phone is not running the version from the ZIP: the install in TWRP failed or was stopped.</string>
