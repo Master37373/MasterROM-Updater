@@ -290,12 +290,12 @@ fun GlassIconButton(
 }
 
 /**
- * One UI page layout: an expanded app bar with a large, centred title (about a third of the
- * screen) and a 56dp bar below it with [navigation] and a small title. Scrolling the page up
- * first collapses the app bar (the large title moves up and fades, the small title fades in);
- * the large title only comes back when the page is scrolled back to the very top or pulled
- * down there. Letting go half way snaps to expanded or collapsed. The app bar can be dragged too.
- * Like in Samsung's Settings, main pages open expanded and sub pages (with a back button) collapsed.
+ * One UI page layout: an expanded app bar (about a third of the screen) and a 56dp bar with
+ * [navigation]. There is one title: large and centred while expanded; scrolling the page up
+ * collapses the app bar and the title glides into the bar while it shrinks, ending small at the
+ * left next to the back button. It only grows back when the page is at the very top again (or
+ * pulled down there). Letting go half way snaps to expanded or collapsed. Main pages open
+ * expanded, sub pages (with a back button) collapsed, like in Samsung's Settings.
  */
 @Composable
 fun CollapsingScreen(
@@ -354,9 +354,6 @@ fun CollapsingScreen(
     }
     val dragState = androidx.compose.foundation.gestures.rememberDraggableState { d -> take(d) }
 
-    val bigAlpha = (1f - collapse / 0.55f).coerceIn(0f, 1f)
-    val smallAlpha = ((collapse - 0.6f) / 0.4f).coerceIn(0f, 1f)
-
     GlassBackground {
         Column(
             Modifier
@@ -374,31 +371,7 @@ fun CollapsingScreen(
                         onDragStopped = { snap() },
                     ),
             ) {
-                // Large title, centred in the space above the bar; moves up as the bar collapses
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(lerpDp(expanded - bar, 0.dp, collapse))
-                        .graphicsLayer { alpha = bigAlpha },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (bigAlpha > 0f) {
-                        Text(
-                            text = title,
-                            color = g.text,
-                            fontSize = 32.sp,
-                            lineHeight = 38.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 2,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .padding(horizontal = 24.dp)
-                                .wrapContentHeight(unbounded = true),
-                        )
-                    }
-                }
-                // Bar: back button and small title
+                // Bar: back button
                 Row(
                     Modifier
                         .align(Alignment.BottomStart)
@@ -407,21 +380,48 @@ fun CollapsingScreen(
                         .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (navigation != null) {
-                        navigation()
-                        Spacer(Modifier.width(10.dp))
-                    } else {
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    Text(
-                        text = title,
-                        color = g.text,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        modifier = Modifier.graphicsLayer { alpha = smallAlpha },
+                    if (navigation != null) navigation()
+                }
+                // One title that moves and shrinks: centred and large in the expanded area,
+                // small at the left of the bar (next to the back button) when collapsed
+                val startCollapsed = if (navigation != null) 14.dp + 44.dp + 12.dp else 22.dp
+                androidx.compose.ui.layout.Layout(
+                    content = {
+                        Text(
+                            text = title,
+                            color = g.text,
+                            fontSize = 32.sp,
+                            lineHeight = 38.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                    },
+                    modifier = Modifier.matchParentSize(),
+                ) { measurables, c ->
+                    val w = c.maxWidth
+                    val h = c.maxHeight
+                    val barH = bar.roundToPx()
+                    val t = measurables[0].measure(
+                        androidx.compose.ui.unit.Constraints(maxWidth = (w - 48.dp.roundToPx()).coerceAtLeast(0)),
                     )
+                    layout(w, h) {
+                        val p = collapse
+                        val s = 1f + (TITLE_SMALL_SCALE - 1f) * p
+                        val xExp = (w - t.width) / 2f
+                        val xCol = startCollapsed.toPx()
+                        val yExp = (h - barH - t.height) / 2f
+                        val yCol = h - barH / 2f - t.height * s / 2f
+                        t.placeWithLayer(
+                            x = (xExp + (xCol - xExp) * p).toInt(),
+                            y = (yExp + (yCol - yExp) * p).toInt(),
+                        ) {
+                            scaleX = s
+                            scaleY = s
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                        }
+                    }
                 }
             }
             Column(
@@ -440,6 +440,9 @@ fun CollapsingScreen(
         }
     }
 }
+
+/** Small title in the bar: 20sp of the 32sp large title. */
+private const val TITLE_SMALL_SCALE = 20f / 32f
 
 private fun lerpDp(a: Dp, b: Dp, t: Float): Dp = a + (b - a) * t
 

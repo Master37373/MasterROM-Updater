@@ -1,5 +1,8 @@
+# 1.0.5
+- Page titles shrink instead of fading: the large centred title shrinks smoothly into the bar while scrolling and grows back at the top of the page
+
 # 1.0.4
-- Page titles work like in One UI: a large centred title at the top that scrolls away with the page, a small title in the bar, and the large one comes back at the top of the page
+- Page titles work like in One UI: a collapsing app bar with a large title at the top of the page
 - Pause and resume continue byte-exactly where the download stopped, nothing is downloaded twice
 - Fixed: resuming started the whole download again (the progress could not be saved in the OTA folder)
 - Resuming within 10 minutes skips the server search
