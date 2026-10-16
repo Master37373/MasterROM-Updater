@@ -86,7 +86,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             val result = try {
                 val d = _device.value
                 val info = UpdateRepository.fetch(d.codename, test = _testMode.value)
-                val rom = info.rom?.takeIf { _testMode.value || compareVersions(it.version, d.romVersion) > 0 }
+                // A phone still on ArtisanROM (no ro.masterrom.version) gets the first MasterROM
+                // release offered although its number (1.0.0) is lower than ArtisanROM's 4.0.x.
+                val fromArtisan = DeviceInfo.prop("ro.masterrom.version").isEmpty()
+                val rom = info.rom?.takeIf { _testMode.value || fromArtisan || compareVersions(it.version, d.romVersion) > 0 }
                 rom?.let { withContext(Dispatchers.IO) { DownloadManager.restore(getApplication<Application>(), DownloadJob.from(it)) } }
                 val kernel = info.kernel?.takeIf { k ->
                     val installed = Regex("ArtisanKRNL-v(\\d+(?:\\.\\d+)+)").find(d.kernel)?.groupValues?.get(1)

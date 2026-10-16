@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version_name:
-        description: 'versionName (leer = 0.1.<Build-Nummer>)'
+        description: 'versionName (leer = Inhalt von version.txt)'
         required: false
         default: ''
 
@@ -36,7 +36,9 @@ jobs:
           INPUT_VERSION: ${{ github.event.inputs.version_name }}
         run: |
           set -e
-          VERSION_NAME="${INPUT_VERSION:-0.1.${{ github.run_number }}}"
+          # versionName comes from version.txt (bump it for a new release); versionCode is the
+          # run number, so every build is newer than the one before (needed for system app updates)
+          VERSION_NAME="${INPUT_VERSION:-$(tr -d '[:space:]' < version.txt)}"
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           gradle --no-daemon :app:assembleRelease \
             -PversionName="$VERSION_NAME" \
