@@ -12,7 +12,12 @@ import kotlinx.coroutines.launch
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-        if (Installer.stagedVersion(context) == null) return
+        val staged = Installer.stagedVersion(context) ?: return
+        // only clean up when the update really was installed; otherwise keep the ZIP for a retry
+        if (com.masterrom.updater.data.compareVersions(com.masterrom.updater.data.DeviceInfo.romVersion, staged) < 0) {
+            Installer.clearStaged(context)
+            return
+        }
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {

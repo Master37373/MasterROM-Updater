@@ -35,7 +35,7 @@ object Installer {
     fun canInstallWithoutRoot(context: Context, zip: File): Boolean {
         val granted = { p: String -> context.checkSelfPermission(p) == android.content.pm.PackageManager.PERMISSION_GRANTED }
         return granted("android.permission.RECOVERY") && granted("android.permission.REBOOT") &&
-            zip.absolutePath.startsWith("/storage/emulated/")
+            (zip.absolutePath.startsWith("/data/ota_package/") || zip.absolutePath.startsWith("/storage/emulated/"))
     }
 
     /**

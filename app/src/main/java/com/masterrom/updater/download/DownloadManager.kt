@@ -58,9 +58,31 @@ object DownloadManager {
      * installed without root. With the SD card as primary storage the private app folder is used.
      */
     fun dir(context: Context): File {
+        // /data/ota_package is Android's own folder for OTA files: the uncrypt service may read it,
+        // so the update can be installed without root. Writable for the system app (cache group).
+        otaPackageDir()?.let { return it }
         val primary = context.getSystemService(android.os.storage.StorageManager::class.java).primaryStorageVolume
         val external = if (primary.isEmulated && primary.uuid == null) context.getExternalFilesDir("ota") else null
         return (external ?: File(context.filesDir, "ota")).apply { mkdirs() }
+    }
+
+    private var otaDirChecked = false
+    private var otaDir: File? = null
+
+    private fun otaPackageDir(): File? {
+        if (otaDirChecked) return otaDir
+        otaDirChecked = true
+        val d = File("/data/ota_package")
+        otaDir = try {
+            val probe = File(d, ".masterrom_probe")
+            probe.writeText("ok")
+            probe.delete()
+            d
+        } catch (e: Exception) {
+            null
+        }
+        android.util.Log.i("MasterROM", "download folder: ${otaDir ?: "app folder"}")
+        return otaDir
     }
 
     /** True when downloads land on internal shared storage (needed for installing without root). */
