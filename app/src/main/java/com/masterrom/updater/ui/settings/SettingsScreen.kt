@@ -37,6 +37,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.masterrom.updater.BuildConfig
 import com.masterrom.updater.R
@@ -54,7 +55,7 @@ import com.masterrom.updater.ui.home.SwitchRow
 import com.masterrom.updater.ui.theme.LocalGlass
 
 @Composable
-fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenChangelog: () -> Unit = {}) {
+fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenChangelog: () -> Unit = {}, onOpenHistory: () -> Unit = {}) {
     val g = LocalGlass.current
     val context = LocalContext.current
     val wifiOnly by vm.wifiOnly.collectAsStateWithLifecycle()
@@ -64,6 +65,12 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenChangelog: () ->
     val download by vm.download.collectAsStateWithLifecycle()
     val device by vm.device.collectAsStateWithLifecycle()
     val devUnlocked by vm.devUnlocked.collectAsStateWithLifecycle()
+    val autoDownload by vm.autoDownload.collectAsStateWithLifecycle()
+    val localZip by vm.localZip.collectAsStateWithLifecycle()
+    var confirmLocal by remember { mutableStateOf(false) }
+    val pickZip = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { uri -> if (uri != null) vm.pickLocalZip(uri) }
     var taps by remember { mutableIntStateOf(0) }
     var toast by remember { mutableStateOf<Toast?>(null) }
     val busy = download.phase == Phase.RUNNING || download.phase == Phase.PREPARING || download.phase == Phase.VERIFYING
@@ -84,6 +91,13 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenChangelog: () ->
                     summary = stringResource(R.string.auto_check_desc),
                     checked = autoCheck,
                     onChange = vm::setAutoCheck,
+                )
+                Spacer(Modifier.height(16.dp))
+                SwitchRow(
+                    title = stringResource(R.string.auto_download),
+                    summary = stringResource(R.string.auto_download_desc),
+                    checked = autoDownload,
+                    onChange = vm::setAutoDownload,
                 )
                 Spacer(Modifier.height(16.dp))
                 SwitchRow(
@@ -111,6 +125,14 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenChangelog: () ->
                     }
                 }
             }
+
+            SectionLabel(stringResource(R.string.settings_manual))
+            LocalZipCard(
+                state = localZip,
+                onPick = { pickZip.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) },
+                onInstall = { confirmLocal = true },
+                onClear = vm::clearLocalZip,
+            )
 
             AnimatedVisibility(
                 visible = devUnlocked,
@@ -167,11 +189,185 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenChangelog: () ->
                         }
                     },
                 )
+                InfoRow(stringResource(R.string.rom_history), "›", divider = true, onClick = onOpenHistory)
                 InfoRow(stringResource(R.string.app_changelog), "›", divider = true, onClick = onOpenChangelog)
                 InfoRow(stringResource(R.string.update_source), UpdateRepository.REPO, divider = true)
                 InfoRow(stringResource(R.string.row_device), device.codename.ifEmpty { "–" }, divider = true)
             }
     }
+
+    if (confirmLocal) {
+        val ready = localZip as? com.masterrom.updater.ui.home.LocalZipState.Ready
+        val name = ready?.name.orEmpty()
+        val extra = listOfNotNull(ready?.check?.let { localWarning(it) }, ready?.check?.let { localAgeText(it) }
+            ?.takeIf { ready?.check?.age == com.masterrom.updater.install.LocalZip.Age.OLDER })
+        val bm = context.getSystemService(android.os.BatteryManager::class.java)
+        val level = remember { bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) }
+        val lowBattery = level < 30 && !bm.isCharging
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmLocal = false },
+            title = { Text(stringResource(R.string.local_install_title, name)) },
+            text = {
+                Text(
+                    if (lowBattery) stringResource(R.string.install_battery_low, level)
+                    else (listOf(stringResource(R.string.local_install_text)) + extra).joinToString("\n\n"),
+                )
+            },
+            confirmButton = {
+                if (!lowBattery) {
+                    androidx.compose.material3.TextButton(onClick = { confirmLocal = false; vm.installLocalZip() }) {
+                        Text(stringResource(R.string.install_confirm))
+                    }
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { confirmLocal = false }) { Text(stringResource(R.string.cancel_no)) }
+            },
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+        )
+    }
+}
+
+/** "Install a ZIP": pick a file, it is copied and checked, then installed like an update. */
+@Composable
+private fun LocalZipCard(
+    state: com.masterrom.updater.ui.home.LocalZipState,
+    onPick: () -> Unit,
+    onInstall: () -> Unit,
+    onClear: () -> Unit,
+) {
+    val g = LocalGlass.current
+    val context = LocalContext.current
+    GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 16.dp)) {
+        when (state) {
+            com.masterrom.updater.ui.home.LocalZipState.Idle -> {
+                Text(stringResource(R.string.local_title), color = g.text, fontSize = 16.sp)
+                Text(stringResource(R.string.local_desc), color = g.subText, fontSize = 13.sp, lineHeight = 18.sp)
+                Spacer(Modifier.height(12.dp))
+                SecondaryButton(stringResource(R.string.local_pick), onClick = onPick, modifier = Modifier.fillMaxWidth(), height = 44.dp)
+            }
+            is com.masterrom.updater.ui.home.LocalZipState.Copying -> {
+                Text(state.name, color = g.text, fontSize = 16.sp, maxLines = 2)
+                Text(
+                    stringResource(R.string.local_copying, (state.progress * 100).toInt()),
+                    color = g.chipText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(10.dp))
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = { state.progress },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = g.accent,
+                    trackColor = g.accent.copy(alpha = 0.18f),
+                )
+                Spacer(Modifier.height(12.dp))
+                com.masterrom.updater.ui.glass.TintButton(stringResource(R.string.cancel), g.error, onClick = onClear, modifier = Modifier.fillMaxWidth(), height = 44.dp)
+            }
+            is com.masterrom.updater.ui.home.LocalZipState.Checking -> {
+                Text(state.name, color = g.text, fontSize = 16.sp, maxLines = 2)
+                Text(
+                    stringResource(R.string.local_checking, (state.progress * 100).toInt()),
+                    color = g.chipText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(10.dp))
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = { state.progress },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = g.accent,
+                    trackColor = g.accent.copy(alpha = 0.18f),
+                )
+            }
+            is com.masterrom.updater.ui.home.LocalZipState.Ready -> {
+                val check = state.check
+                Text(state.name, color = g.text, fontSize = 16.sp, maxLines = 2)
+                Text(Formatter.formatShortFileSize(context, state.size), color = g.subText, fontSize = 13.sp)
+                Spacer(Modifier.height(8.dp))
+                com.masterrom.updater.ui.glass.ChipRow {
+                    when (check.trust) {
+                        com.masterrom.updater.install.LocalZip.Trust.OFFICIAL ->
+                            com.masterrom.updater.ui.glass.Chip(stringResource(R.string.local_official), g.success)
+                        com.masterrom.updater.install.LocalZip.Trust.RESIGNED ->
+                            com.masterrom.updater.ui.glass.Chip(stringResource(R.string.local_resigned), g.error)
+                        com.masterrom.updater.install.LocalZip.Trust.UNSIGNED ->
+                            com.masterrom.updater.ui.glass.Chip(stringResource(R.string.local_unsigned), g.error)
+                    }
+                    localVersionText(check)?.let { com.masterrom.updater.ui.glass.Chip(it) }
+                }
+                localWarning(check)?.let { w ->
+                    Text(w, color = g.error, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 8.dp))
+                }
+                localAgeText(check)?.let { a ->
+                    Text(
+                        a,
+                        color = if (check.age == com.masterrom.updater.install.LocalZip.Age.OLDER) g.warning else g.subText,
+                        fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    com.masterrom.updater.ui.glass.TintButton(stringResource(R.string.cancel), g.error, onClick = onClear, modifier = Modifier.weight(1f), height = 46.dp)
+                    if (check.trust == com.masterrom.updater.install.LocalZip.Trust.OFFICIAL) {
+                        com.masterrom.updater.ui.glass.PrimaryButton(stringResource(R.string.local_install), onClick = onInstall, modifier = Modifier.weight(1f), height = 46.dp)
+                    } else {
+                        com.masterrom.updater.ui.glass.TintButton(stringResource(R.string.local_install_anyway), g.warning, onClick = onInstall, modifier = Modifier.weight(1f), height = 46.dp)
+                    }
+                }
+            }
+            is com.masterrom.updater.ui.home.LocalZipState.Preparing -> {
+                Text(
+                    stringResource(R.string.install_preparing) + if (state.progress >= 0f) " ${(state.progress * 100).toInt()}%" else "",
+                    color = g.chipText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                )
+                Text(stringResource(R.string.install_preparing_text), color = g.subText, fontSize = 13.sp, lineHeight = 18.sp)
+            }
+            is com.masterrom.updater.ui.home.LocalZipState.Failed -> {
+                Text(
+                    stringResource(
+                        when (state.reason) {
+                            com.masterrom.updater.install.LocalZip.Reason.NO_SPACE -> R.string.local_err_space
+                            com.masterrom.updater.install.LocalZip.Reason.NOT_FLASHABLE -> R.string.local_err_flashable
+                            com.masterrom.updater.install.LocalZip.Reason.READ_FAILED -> R.string.local_err_read
+                            com.masterrom.updater.install.LocalZip.Reason.WRONG_DEVICE -> R.string.local_err_device
+                            null -> R.string.err_system
+                        },
+                    ),
+                    color = g.error, fontSize = 14.sp, lineHeight = 20.sp,
+                )
+                Spacer(Modifier.height(12.dp))
+                SecondaryButton(stringResource(R.string.local_pick), onClick = { onClear(); onPick() }, modifier = Modifier.fillMaxWidth(), height = 44.dp)
+            }
+        }
+    }
 }
 
 private const val DEV_TAPS = 7
+
+/** "MasterROM 1.0.2" / "ArtisanKRNL 4.0.1 · mr3.1" for the chip, null when unknown. */
+@Composable
+private fun localVersionText(c: com.masterrom.updater.install.LocalZip.Check): String? {
+    val v = c.version ?: return null
+    return when (c.kind) {
+        com.masterrom.updater.install.LocalZip.Kind.ROM -> "MasterROM $v"
+        com.masterrom.updater.install.LocalZip.Kind.KERNEL -> com.masterrom.updater.data.KernelVersion.label(v) ?: v
+        com.masterrom.updater.install.LocalZip.Kind.OTHER -> null
+    }
+}
+
+/** Warning for a ZIP that is not signed by MasterROM, null for an official one. */
+@Composable
+private fun localWarning(c: com.masterrom.updater.install.LocalZip.Check): String? = when (c.trust) {
+    com.masterrom.updater.install.LocalZip.Trust.OFFICIAL -> null
+    com.masterrom.updater.install.LocalZip.Trust.RESIGNED -> stringResource(R.string.local_resigned_warning)
+    com.masterrom.updater.install.LocalZip.Trust.UNSIGNED -> stringResource(R.string.local_unsigned_warning)
+}
+
+/** Newer / same / older than the installed version. */
+@Composable
+private fun localAgeText(c: com.masterrom.updater.install.LocalZip.Check): String? = when (c.age) {
+    com.masterrom.updater.install.LocalZip.Age.NEWER -> stringResource(R.string.local_age_newer, c.installed)
+    com.masterrom.updater.install.LocalZip.Age.SAME -> stringResource(R.string.local_age_same)
+    com.masterrom.updater.install.LocalZip.Age.OLDER -> stringResource(
+        if (c.kind == com.masterrom.updater.install.LocalZip.Kind.ROM) R.string.local_age_older_rom else R.string.local_age_older,
+        c.installed,
+    )
+    com.masterrom.updater.install.LocalZip.Age.UNKNOWN -> null
+}

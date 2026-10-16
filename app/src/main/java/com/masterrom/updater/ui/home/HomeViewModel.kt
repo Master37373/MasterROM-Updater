@@ -44,6 +44,16 @@ sealed interface InstallState {
     data class Failed(val reason: Installer.Reason) : InstallState
 }
 
+sealed interface LocalZipState {
+    data object Idle : LocalZipState
+    data class Copying(val name: String, val progress: Float) : LocalZipState
+    /** The signature and version check; [progress] 0..1 (reads the whole file). */
+    data class Checking(val name: String, val progress: Float) : LocalZipState
+    data class Ready(val name: String, val size: Long, val check: com.masterrom.updater.install.LocalZip.Check) : LocalZipState
+    data class Preparing(val progress: Float = -1f) : LocalZipState
+    data class Failed(val reason: com.masterrom.updater.install.LocalZip.Reason?) : LocalZipState
+}
+
 data class DeviceState(val romVersion: String, val kernel: String, val model: String, val codename: String)
 
 sealed interface UpdateState {
@@ -81,15 +91,16 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             }
             withContext(Dispatchers.IO) { com.masterrom.updater.install.OldUpdater.removeIfPresent(app) }
             com.masterrom.updater.check.UpdateCheckJob.schedule(app)
-            // the update was installed: remove the leftovers (the boot receiver usually did this already)
-            val staged = Installer.stagedVersion(app)
-            if (staged != null && compareVersions(DeviceInfo.romVersion, staged) >= 0) {
+            // result of the last install (the boot receiver usually evaluated it already)
+            val result = withContext(Dispatchers.IO) { com.masterrom.updater.install.PostUpdate.evaluate(app) }
+            if (result?.kind == com.masterrom.updater.install.PostUpdate.Kind.ROM_OK) {
                 withContext(Dispatchers.IO) {
                     Installer.cleanup()
                     DownloadManager.deleteFiles(app)
                 }
                 Installer.clearStaged(app)
             }
+            loadPostUpdate()
             check()
         }
     }
@@ -156,7 +167,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun pauseDownload() = DownloadManager.pause(getApplication<Application>())
 
-    fun cancelDownload() = DownloadManager.cancel(getApplication<Application>())
+    fun cancelDownload() {
+        cancelNightInstall()
+        DownloadManager.cancel(getApplication<Application>())
+    }
 
     fun setWifiOnly(value: Boolean) {
         DownloadManager.setWifiOnly(getApplication<Application>(), value)
@@ -184,6 +198,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val job = DownloadManager.state.value.job ?: return
         val app = getApplication<Application>()
         val zip = DownloadManager.file(app, job)
+        cancelNightInstall()
         viewModelScope.launch {
             _install.value = InstallState.Preparing()
             Installer.markStaged(app, job.version)
@@ -225,6 +240,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     _kernelState.value = KernelState.Downloading(p)
                 }
                 _kernelState.value = KernelState.Preparing()
+                com.masterrom.updater.install.PostUpdate.markKernel(app, k.version)
                 if (Installer.canInstallWithoutRoot(app, zip)) {
                     Installer.installWithoutRoot(app, zip) { p -> _kernelState.value = KernelState.Preparing(p) }
                 } else {
@@ -232,6 +248,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 }
             } catch (e: Exception) {
                 android.util.Log.i("MasterROM", "kernel install failed: $e")
+                com.masterrom.updater.install.PostUpdate.clearKernel(app)
                 withContext(Dispatchers.IO) { com.masterrom.updater.data.KernelDownload.deleteAll(dir) }
                 _kernelState.value = KernelState.Failed
             }
@@ -302,8 +319,130 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun deleteDownloads() {
+        cancelNightInstall()
         DownloadManager.cancel(getApplication<Application>())
         refreshStorage()
+    }
+
+    // ---- automatic download and night install ----
+
+    private val _autoDownload = MutableStateFlow(com.masterrom.updater.schedule.Schedule.autoDownload(app))
+    val autoDownload: StateFlow<Boolean> = _autoDownload.asStateFlow()
+
+    /** Automatic download needs the daily check, so turning it on turns that on too. */
+    fun setAutoDownload(on: Boolean) {
+        com.masterrom.updater.schedule.Schedule.setAutoDownload(getApplication<Application>(), on)
+        _autoDownload.value = on
+        if (on && !_autoCheck.value) setAutoCheck(true)
+    }
+
+    private val _nightAt = MutableStateFlow(com.masterrom.updater.schedule.Schedule.nightInstallAt(app))
+    /** Time of the planned night install, 0 when none is planned. */
+    val nightAt: StateFlow<Long> = _nightAt.asStateFlow()
+
+    fun planNightInstall() {
+        val job = DownloadManager.state.value.job ?: return
+        _nightAt.value = com.masterrom.updater.schedule.Schedule.planNightInstall(getApplication<Application>(), job)
+    }
+
+    fun cancelNightInstall() {
+        com.masterrom.updater.schedule.Schedule.cancelNightInstall(getApplication<Application>())
+        _nightAt.value = 0L
+    }
+
+    // ---- after an install ----
+
+    private val _postUpdate = MutableStateFlow<com.masterrom.updater.install.PostUpdate.Result?>(null)
+    /** Result of the last install, shown once on the start screen. */
+    val postUpdate: StateFlow<com.masterrom.updater.install.PostUpdate.Result?> = _postUpdate.asStateFlow()
+
+    private val _postChangelog = MutableStateFlow<List<String>>(emptyList())
+    /** What's new in the version that was just installed. */
+    val postChangelog: StateFlow<List<String>> = _postChangelog.asStateFlow()
+
+    private fun loadPostUpdate() {
+        val r = com.masterrom.updater.install.PostUpdate.pending(getApplication<Application>())
+        _postUpdate.value = r
+        if (r?.kind == com.masterrom.updater.install.PostUpdate.Kind.ROM_OK) {
+            viewModelScope.launch { _postChangelog.value = com.masterrom.updater.data.Changelog.forVersion(r.version) }
+        }
+    }
+
+    fun dismissPostUpdate() {
+        com.masterrom.updater.install.PostUpdate.dismiss(getApplication<Application>())
+        _postUpdate.value = null
+    }
+
+    // ---- install a ZIP the user picked ----
+
+    private val _localZip = MutableStateFlow<LocalZipState>(LocalZipState.Idle)
+    val localZip: StateFlow<LocalZipState> = _localZip.asStateFlow()
+    private var localFile: java.io.File? = null
+    private var localJob: kotlinx.coroutines.Job? = null
+
+    fun pickLocalZip(uri: android.net.Uri) {
+        if (_localZip.value is LocalZipState.Copying || _localZip.value is LocalZipState.Checking || _localZip.value is LocalZipState.Preparing) return
+        val app = getApplication<Application>()
+        localJob = viewModelScope.launch {
+            val info = withContext(Dispatchers.IO) {
+                runCatching { com.masterrom.updater.install.LocalZip.info(app, uri) }.getOrNull()
+            }
+            if (info == null) {
+                _localZip.value = LocalZipState.Failed(com.masterrom.updater.install.LocalZip.Reason.READ_FAILED)
+                return@launch
+            }
+            _localZip.value = LocalZipState.Copying(info.name, 0f)
+            try {
+                val (file, md5) = com.masterrom.updater.install.LocalZip.copy(app, uri, info) { p ->
+                    _localZip.value = LocalZipState.Copying(info.name, p)
+                }
+                _localZip.value = LocalZipState.Checking(info.name, 0f)
+                val check = try {
+                    com.masterrom.updater.install.LocalZip.check(app, file, md5) { p ->
+                        _localZip.value = LocalZipState.Checking(info.name, p)
+                    }
+                } catch (e: Exception) {
+                    file.delete()
+                    throw e
+                }
+                localFile = file
+                _localZip.value = LocalZipState.Ready(info.name, file.length(), check)
+            } catch (e: com.masterrom.updater.install.LocalZip.LocalZipException) {
+                _localZip.value = LocalZipState.Failed(e.reason)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.i("MasterROM", "local zip failed: $e")
+                _localZip.value = LocalZipState.Failed(com.masterrom.updater.install.LocalZip.Reason.READ_FAILED)
+            }
+        }
+    }
+
+    fun installLocalZip() {
+        val zip = localFile ?: return
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            _localZip.value = LocalZipState.Preparing()
+            try {
+                if (Installer.canInstallWithoutRoot(app, zip)) {
+                    Installer.installWithoutRoot(app, zip) { p -> _localZip.value = LocalZipState.Preparing(p) }
+                } else {
+                    Installer.installAndReboot(zip)
+                }
+            } catch (e: Exception) {
+                android.util.Log.i("MasterROM", "local zip install failed: $e")
+                _localZip.value = LocalZipState.Failed(null)
+            }
+        }
+    }
+
+    /** Stops copying / forgets the picked ZIP and deletes the copy. */
+    fun clearLocalZip() {
+        localJob?.cancel()
+        localFile = null
+        _localZip.value = LocalZipState.Idle
+        val app = getApplication<Application>()
+        viewModelScope.launch(Dispatchers.IO) { com.masterrom.updater.install.LocalZip.deleteAll(app) }
     }
 
     private companion object {

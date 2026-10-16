@@ -113,12 +113,22 @@ class UpdateCheckJob : JobService() {
                 return
             }
             prefs(c).edit().putLong("last_check", System.currentTimeMillis()).apply()
+            // automatic download over Wi-Fi (also continues a download that stopped on an earlier day)
+            val job = com.masterrom.updater.download.DownloadJob.from(rom)
+            val auto = com.masterrom.updater.schedule.Schedule.autoDownload(c) &&
+                com.masterrom.updater.schedule.Schedule.unmetered(c) &&
+                !com.masterrom.updater.download.DownloadService.running &&
+                !com.masterrom.updater.download.DownloadManager.okMarker(c, job).exists()
+            if (auto) com.masterrom.updater.schedule.Schedule.downloadSoon(c, job)
             if (prefs(c).getString(KEY_NOTIFIED, null) == rom.version) return
-            notify(c, NOTIF_ID, c.getString(R.string.notif_update_title, rom.version), c.getString(R.string.notif_update_text))
+            notify(
+                c, NOTIF_ID, c.getString(R.string.notif_update_title, rom.version),
+                c.getString(if (auto) R.string.notif_update_auto_text else R.string.notif_update_text),
+            )
             prefs(c).edit().putString(KEY_NOTIFIED, rom.version).apply()
         }
 
-        private fun notify(c: Context, id: Int, title: String, text: String) {
+        fun notify(c: Context, id: Int, title: String, text: String) {
             val nm = c.getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(
                 NotificationChannel(CHANNEL, c.getString(R.string.notif_channel_updates), NotificationManager.IMPORTANCE_DEFAULT),

@@ -40,9 +40,11 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AppRoot() {
     val vm: HomeViewModel = viewModel()
-    // 0 = start screen, 1 = settings, 2 = updater changelog
+    // 0 = start screen, 1 = settings, 2 = updater changelog, 3 = ROM version history
     var screen by rememberSaveable { mutableStateOf(0) }
-    BackHandler(enabled = screen > 0) { screen -= 1 }
+    // where the version history was opened from (start screen or settings)
+    var historyFrom by rememberSaveable { mutableStateOf(1) }
+    BackHandler(enabled = screen > 0) { screen = if (screen == 3) historyFrom else screen - 1 }
 
     AnimatedContent(
         targetState = screen,
@@ -59,9 +61,15 @@ private fun AppRoot() {
         label = "screen",
     ) { current ->
         when (current) {
+            3 -> com.masterrom.updater.ui.settings.RomHistoryScreen(onBack = { screen = historyFrom })
             2 -> AppChangelogScreen(onBack = { screen = 1 })
-            1 -> SettingsScreen(vm, onBack = { screen = 0 }, onOpenChangelog = { screen = 2 })
-            else -> HomeScreen(vm, onOpenSettings = { screen = 1 })
+            1 -> SettingsScreen(
+                vm,
+                onBack = { screen = 0 },
+                onOpenChangelog = { screen = 2 },
+                onOpenHistory = { historyFrom = 1; screen = 3 },
+            )
+            else -> HomeScreen(vm, onOpenSettings = { screen = 1 }, onOpenHistory = { historyFrom = 0; screen = 3 })
         }
     }
 }

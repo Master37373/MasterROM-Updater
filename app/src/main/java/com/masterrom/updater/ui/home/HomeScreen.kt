@@ -82,7 +82,7 @@ import com.masterrom.updater.ui.glass.TintButton
 import com.masterrom.updater.ui.theme.LocalGlass
 
 @Composable
-fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {}) {
+fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {}, onOpenHistory: () -> Unit = {}) {
     val state by vm.state.collectAsStateWithLifecycle()
     val device by vm.device.collectAsStateWithLifecycle()
     val lastChecked by vm.lastChecked.collectAsStateWithLifecycle()
@@ -94,6 +94,9 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
     var confirmInstall by remember { mutableStateOf(false) }
     var confirmKernel by remember { mutableStateOf(false) }
     val installState by vm.install.collectAsStateWithLifecycle()
+    val nightAt by vm.nightAt.collectAsStateWithLifecycle()
+    val postUpdate by vm.postUpdate.collectAsStateWithLifecycle()
+    val postChangelog by vm.postChangelog.collectAsStateWithLifecycle()
 
     // Notifications are optional: the download starts whether or not the permission is granted.
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { vm.startDownload() }
@@ -121,6 +124,11 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
     }
 
     CollapsingScreen(title = stringResource(R.string.title_software_update)) {
+
+            // result of the last install (shown once after the reboot)
+            postUpdate?.let { r ->
+                PostUpdateCard(r, postChangelog, onDismiss = vm::dismissPostUpdate, onOpenHistory = onOpenHistory)
+            }
 
             // Which card is shown: the check result, or the download once one exists for the offered build.
             val avail = state as? UpdateState.Available
@@ -151,6 +159,9 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
                                 onCancel = { confirmCancel = true },
                                 install = installState,
                                 onInstall = { confirmInstall = true },
+                                nightAt = nightAt,
+                                onNight = vm::planNightInstall,
+                                onCancelNight = vm::cancelNightInstall,
                             )
                         } else {
                             when (s) {
@@ -332,6 +343,9 @@ private fun DownloadContent(
     onCancel: () -> Unit,
     install: InstallState,
     onInstall: () -> Unit,
+    nightAt: Long,
+    onNight: () -> Unit,
+    onCancelNight: () -> Unit,
 ) {
     val g = LocalGlass.current
     val context = LocalContext.current
@@ -411,10 +425,25 @@ private fun DownloadContent(
                     textAlign = TextAlign.Center,
                 )
             }
+            if (nightAt > 0L) {
+                Chip(stringResource(R.string.night_planned, nightTime(nightAt)), g.success)
+            }
             Spacer(Modifier.height(4.dp))
             ButtonPair(
                 secondary = stringResource(R.string.delete), onSecondary = onCancel,
                 primary = stringResource(R.string.install_now), onPrimary = onInstall,
+            )
+            // Samsung-style "install tonight"
+            Text(
+                if (nightAt > 0L) stringResource(R.string.night_cancel)
+                else stringResource(R.string.night_install, nightTime(com.masterrom.updater.schedule.Schedule.nextNight(System.currentTimeMillis()))),
+                color = g.chipText,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .clickable { if (nightAt > 0L) onCancelNight() else onNight() }
+                    .padding(8.dp),
             )
         }
         Phase.FAILED -> {
@@ -656,3 +685,61 @@ private fun lastCheckedText(time: Long): String =
         R.string.last_checked,
         DateUtils.getRelativeTimeSpanString(time, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString(),
     )
+
+/** "02:00" in the phone's time format. */
+@Composable
+private fun nightTime(at: Long): String = android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(java.util.Date(at))
+
+/** Shown once after the reboot: the update was installed (with what's new) or it failed. */
+@Composable
+private fun PostUpdateCard(
+    r: com.masterrom.updater.install.PostUpdate.Result,
+    changelog: List<String>,
+    onDismiss: () -> Unit,
+    onOpenHistory: () -> Unit,
+) {
+    val g = LocalGlass.current
+    val ok = r.kind == com.masterrom.updater.install.PostUpdate.Kind.ROM_OK ||
+        r.kind == com.masterrom.updater.install.PostUpdate.Kind.KERNEL_OK
+    val isRom = r.kind == com.masterrom.updater.install.PostUpdate.Kind.ROM_OK ||
+        r.kind == com.masterrom.updater.install.PostUpdate.Kind.ROM_FAILED
+    val label = com.masterrom.updater.install.PostUpdate.label(r)
+    GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 18.dp)) {
+        Text(
+            stringResource(if (ok) R.string.post_ok_title else R.string.post_failed_title, label),
+            color = if (ok) g.text else g.error,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            stringResource(
+                when {
+                    ok -> R.string.post_ok_text
+                    isRom -> R.string.post_failed_text
+                    else -> R.string.post_failed_kernel_text
+                },
+            ),
+            color = g.subText,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        if (ok && changelog.isNotEmpty()) {
+            Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                changelog.filter { !it.startsWith("\u00a7") }.take(5).forEach { line ->
+                    Row {
+                        Text("\u2022", color = g.accent, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 10.dp))
+                        Text(line, color = g.subText, fontSize = 14.sp, lineHeight = 20.sp)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (ok && isRom) {
+                SecondaryButton(stringResource(R.string.rom_history), onClick = onOpenHistory, modifier = Modifier.weight(1f), height = 46.dp)
+            }
+            PrimaryButton(stringResource(R.string.ok), onClick = onDismiss, modifier = Modifier.weight(1f), height = 46.dp)
+        }
+    }
+}

@@ -1,3 +1,11 @@
+# 1.1.0
+- Download automatically over Wi-Fi: new MasterROM versions are downloaded by themselves (Settings)
+- Install tonight: a downloaded update can be installed at 2:00 at night, also when the app is closed (skipped when the battery is below 30 % and not charging)
+- After the restart the updater tells whether the update or kernel was installed, with what's new
+- MasterROM version history with all versions and their changes
+- Install a ZIP: any ROM, kernel or TWRP ZIP from the storage can be installed like an update, without root
+- ZIP check before installing: signed by MasterROM or re-signed / unsigned (with a warning), the version inside compared with the installed one, and whether it is for this phone
+
 # 1.0.5
 - Page titles shrink instead of fading: the large centred title shrinks smoothly into the bar while scrolling and grows back at the top of the page
 

@@ -17,8 +17,14 @@ object Changelog {
     /** The updater's own changelog in its repo (for "what's new" of a self-update). */
     const val APP_URL_MD = "https://raw.githubusercontent.com/Master37373/MasterROM-Updater/refs/heads/main/CHANGELOG.md"
 
-    suspend fun forVersion(version: String, url: String = URL_MD): List<String> = withContext(Dispatchers.IO) {
-        val text = try {
+    suspend fun forVersion(version: String, url: String = URL_MD): List<String> =
+        fetch(url)?.let { parse(it, version) } ?: emptyList()
+
+    /** All versions of the ROM changelog, newest first; null when it could not be loaded. */
+    suspend fun allRom(): List<Changelog.Section>? = fetch(URL_MD)?.let { parseAll(it) }
+
+    private suspend fun fetch(url: String): String? = withContext(Dispatchers.IO) {
+        try {
             val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 10_000
                 readTimeout = 15_000
@@ -26,15 +32,13 @@ object Changelog {
                 setRequestProperty("Cache-Control", "no-cache")
             }
             try {
-                if (conn.responseCode != 200) return@withContext emptyList()
-                conn.inputStream.bufferedReader().readText()
+                if (conn.responseCode != 200) null else conn.inputStream.bufferedReader().readText()
             } finally {
                 conn.disconnect()
             }
         } catch (e: Exception) {
-            return@withContext emptyList()
+            null
         }
-        parse(text, version)
     }
 
     internal fun parse(markdown: String, version: String): List<String> {

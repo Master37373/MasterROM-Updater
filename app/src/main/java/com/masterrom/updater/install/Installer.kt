@@ -140,7 +140,10 @@ object Installer {
     private fun prefs(context: Context) = context.getSharedPreferences("updater", Context.MODE_PRIVATE)
 
     fun markStaged(context: Context, version: String) =
-        prefs(context).edit().putString("staged_version", version).commit()
+        prefs(context).edit().putString("staged_version", version).putLong("staged_at", System.currentTimeMillis()).commit()
+
+    /** When the last install was started (ms), 0 if unknown. */
+    fun stagedAt(context: Context): Long = prefs(context).getLong("staged_at", 0L)
 
     fun stagedVersion(context: Context): String? = prefs(context).getString("staged_version", null)
 
