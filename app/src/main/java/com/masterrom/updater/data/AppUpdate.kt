@@ -29,7 +29,12 @@ object AppUpdate {
             conn.disconnect()
         }
         val version = json.optString("tag_name").removePrefix("v")
-        if (version.isEmpty() || compareVersions(version, BuildConfig.VERSION_NAME) <= 0) return@withContext null
+        if (version.isEmpty()) return@withContext null
+        // The build number in the release notes decides ("Build: 123", the CI run number = versionCode),
+        // so a version can be published again with fixes and still reach the phones.
+        val build = Regex("""Build:\s*(\d+)""").find(json.optString("body"))?.groupValues?.get(1)?.toLongOrNull()
+        val newer = if (build != null) build > BuildConfig.VERSION_CODE.toLong() else compareVersions(version, BuildConfig.VERSION_NAME) > 0
+        if (!newer) return@withContext null
         val assets = json.optJSONArray("assets") ?: return@withContext null
         for (i in 0 until assets.length()) {
             val a = assets.getJSONObject(i)

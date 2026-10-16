@@ -83,6 +83,9 @@ jobs:
           # notes = the section of this version from CHANGELOG.md
           awk -v ver="$VERSION_NAME" '/^# /{ if (p) exit; if ($2 == ver) { p = 1; next } } p' CHANGELOG.md > notes.md
           [ -s notes.md ] || echo "MasterROM Updater $VERSION_NAME" > notes.md
+          # the phones compare this build number (= versionCode), so the same version can be published again
+          printf '\nBuild: %s\n' "${{ github.run_number }}" >> notes.md
           cat notes.md
+          gh release delete "v$VERSION_NAME" --cleanup-tag -y 2>/dev/null || true
           gh release create "v$VERSION_NAME" out/*.apk \
             --title "MasterROM Updater $VERSION_NAME" --notes-file notes.md --latest
