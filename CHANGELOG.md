@@ -1,3 +1,9 @@
+# 1.0.4
+- Page titles work like in One UI: a large centred title at the top that scrolls away with the page, a small title in the bar, and the large one comes back at the top of the page
+- Pause and resume continue byte-exactly where the download stopped, nothing is downloaded twice
+- Fixed: resuming started the whole download again (the progress could not be saved in the OTA folder)
+- Resuming within 10 minutes skips the server search
+
 # 1.0.3
 - Updater self-update: Android's install confirmation is shown again, and a failed update no longer hangs at "Installing"
 

@@ -142,4 +142,21 @@ object DownloadManager {
 
     private fun prefs(context: Context) = context.getSharedPreferences("updater", Context.MODE_PRIVATE)
     private const val KEY_WIFI_ONLY = "wifi_only"
+
+    // mirrors found for a job, reused when the download is resumed within a few minutes
+    private var mirrorCache: Triple<String, Long, List<com.masterrom.updater.data.Mirror>>? = null
+    private const val MIRROR_CACHE_MS = 10L * 60 * 1000
+
+    fun cachedMirrors(job: DownloadJob): List<com.masterrom.updater.data.Mirror>? {
+        val c = mirrorCache ?: return null
+        return c.third.takeIf { c.first == job.filename && System.currentTimeMillis() - c.second < MIRROR_CACHE_MS && it.isNotEmpty() }
+    }
+
+    fun cacheMirrors(job: DownloadJob, mirrors: List<com.masterrom.updater.data.Mirror>) {
+        mirrorCache = Triple(job.filename, System.currentTimeMillis(), mirrors)
+    }
+
+    fun forgetMirrors() {
+        mirrorCache = null
+    }
 }

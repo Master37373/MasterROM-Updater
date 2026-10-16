@@ -28,8 +28,9 @@ class WifiRequiredException : IOException("Wi-Fi required")
  * Segmented download over several mirrors at once (like aria2c).
  *
  * The file is split into 16 MiB chunks. [connections] workers take chunks from a queue and fetch
- * them with HTTP range requests, spreading the work over all healthy mirrors. Finished chunks are
- * recorded in [stateFile], so a paused or interrupted download continues where it stopped.
+ * them with HTTP range requests, spreading the work over all healthy mirrors. Finished chunks and
+ * the exact position inside unfinished ones are recorded in [stateFile], so a paused or
+ * interrupted download continues byte-exactly where it stopped (nothing is fetched twice).
  */
 class DownloadEngine(
     private val file: File,
@@ -46,6 +47,8 @@ class DownloadEngine(
 
     private val slots = mirrors.map { Slot(it) }
     private val chunkCount = ((size + CHUNK - 1) / CHUNK).toInt()
+    /** Bytes already written at the start of unfinished chunks (chunk index -> bytes). */
+    private val partial = java.util.concurrent.ConcurrentHashMap<Int, Long>()
     private val done: BitSet = loadState()
     private val stateLock = Any()
     private val next = AtomicInteger(0)
@@ -104,8 +107,16 @@ class DownloadEngine(
     private suspend fun fetchChunk(idx: Int, worker: Int, channel: FileChannel) {
         val start = idx * CHUNK
         val end = minOf(size, start + CHUNK) - 1
-        var pos = start
+        var pos = start + (partial[idx] ?: 0L).coerceIn(0L, end - start + 1)
         var attempt = 0
+        if (pos > end) {
+            // cut off exactly at the end of the chunk: nothing left to fetch
+            synchronized(stateLock) {
+                done.set(idx)
+                partial.remove(idx)
+            }
+            return
+        }
         val buffer = ByteBuffer.allocate(256 * 1024)
         while (true) {
             coroutineContext.ensureActive()
@@ -141,12 +152,16 @@ class DownloadEngine(
                         var written = 0
                         while (written < n) written += channel.write(buffer, pos + written)
                         pos += n
+                        partial[idx] = pos - start
                         downloaded.addAndGet(n.toLong())
                     }
                 }
                 if (pos <= end) throw IOException("Connection closed early by ${slot.mirror.name}")
                 slot.failures.set(0)
-                synchronized(stateLock) { done.set(idx) }
+                synchronized(stateLock) {
+                    done.set(idx)
+                    partial.remove(idx)
+                }
                 return
             } catch (e: CancellationException) {
                 throw e
@@ -183,7 +198,7 @@ class DownloadEngine(
             sum += minOf(size, (i + 1) * CHUNK) - i * CHUNK
             i = done.nextSetBit(i + 1)
         }
-        return sum
+        return sum + partial.values.sum()
     }
 
     private fun loadState(): BitSet {
@@ -191,17 +206,37 @@ class DownloadEngine(
         return try {
             val lines = stateFile.readLines()
             if (lines.size < 3 || lines[0].toLong() != size || lines[1].toLong() != CHUNK) return BitSet(chunkCount)
-            BitSet.valueOf(java.util.Base64.getDecoder().decode(lines[2]))
+            val bits = BitSet.valueOf(java.util.Base64.getDecoder().decode(lines[2]))
+            // line 4 (optional): "index:bytes,index:bytes" for chunks that were cut off mid-way
+            lines.getOrNull(3)?.split(',')?.forEach { e ->
+                val i = e.substringBefore(':').toIntOrNull() ?: return@forEach
+                val b = e.substringAfter(':').toLongOrNull() ?: return@forEach
+                if (i in 0 until chunkCount && !bits.get(i) && b > 0) partial[i] = b
+            }
+            bits
         } catch (e: Exception) {
             BitSet(chunkCount)
         }
     }
 
     private fun saveState() {
-        val bits = synchronized(stateLock) { done.clone() as BitSet }
+        val (bits, parts) = synchronized(stateLock) {
+            (done.clone() as BitSet) to partial.entries.joinToString(",") { "${it.key}:${it.value}" }
+        }
+        val text = "$size\n$CHUNK\n" + java.util.Base64.getEncoder().encodeToString(bits.toByteArray()) + "\n$parts\n"
         val tmp = File(stateFile.path + ".tmp")
-        tmp.writeText("$size\n$CHUNK\n" + java.util.Base64.getEncoder().encodeToString(bits.toByteArray()) + "\n")
-        tmp.renameTo(stateFile)
+        try {
+            tmp.writeText(text)
+            // /data/ota_package: older ROM builds do not allow the updater to rename files there
+            // (SELinux), so fall back to writing the state file directly
+            if (!tmp.renameTo(stateFile)) {
+                stateFile.writeText(text)
+                tmp.delete()
+            }
+        } catch (e: Exception) {
+            runCatching { stateFile.writeText(text) }
+            android.util.Log.i("MasterROM", "state save: $e")
+        }
     }
 
     companion object {

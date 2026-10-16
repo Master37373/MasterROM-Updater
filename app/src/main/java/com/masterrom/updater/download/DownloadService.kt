@@ -117,7 +117,9 @@ class DownloadService : Service() {
                 return
             }
 
-            val mirrors = Mirrors.resolve(job.urls, job.size)
+            // after a short pause the servers found a moment ago are still good: no new search
+            val cached = DownloadManager.cachedMirrors(job)
+            val mirrors = cached ?: Mirrors.resolve(job.urls, job.size).also { DownloadManager.cacheMirrors(job, it) }
             if (mirrors.isEmpty()) {
                 fail(DlError.NO_MIRROR); return
             }
@@ -138,6 +140,7 @@ class DownloadService : Service() {
         } catch (w: WifiRequiredException) {
             DownloadManager.update { it.copy(phase = Phase.PAUSED, speed = 0, error = DlError.WIFI_REQUIRED) }
         } catch (io: IOException) {
+            DownloadManager.forgetMirrors()
             if (stopReason != null) applyStop()
             else fail(if (io.message?.contains("ENOSPC") == true) DlError.NO_SPACE else DlError.NETWORK)
         } finally {

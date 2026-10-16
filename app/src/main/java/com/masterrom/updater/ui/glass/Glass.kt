@@ -45,6 +45,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -286,74 +290,139 @@ fun GlassIconButton(
 }
 
 /**
- * Screen with a large, centred One UI title at the top (no toolbar bar). Scrolling down shrinks
- * the title and fades it out; scrolling up (or reaching the top again) brings it back.
- * [navigation] (back button) stays at the left edge.
+ * One UI page layout: an expanded app bar with a large, centred title (about a third of the
+ * screen) and a 56dp bar below it with [navigation] and a small title. Scrolling the page up
+ * first collapses the app bar (the large title moves up and fades, the small title fades in);
+ * the large title only comes back when the page is scrolled back to the very top or pulled
+ * down there. Letting go half way snaps to expanded or collapsed. The app bar can be dragged too.
+ * Like in Samsung's Settings, main pages open expanded and sub pages (with a back button) collapsed.
  */
 @Composable
 fun CollapsingScreen(
     title: String,
     navigation: (@Composable () -> Unit)? = null,
+    startExpanded: Boolean = navigation == null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val g = LocalGlass.current
-    val scroll = rememberScrollState()
     val density = LocalDensity.current
-    val threshold = with(density) { 8.dp.toPx() }
-    val jitter = with(density) { 4.dp.toPx() }
-    var hidden by remember { mutableStateOf(false) }
-    LaunchedEffect(scroll) {
-        var last = 0
-        snapshotFlow { scroll.value }.collect { v ->
-            when {
-                v <= threshold -> hidden = false
-                v - last > jitter -> hidden = true   // scrolling down
-                last - v > jitter -> hidden = false  // scrolling up
-            }
-            if (kotlin.math.abs(v - last) > jitter || v <= threshold) last = v
+    val screenH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
+    val bar = 56.dp
+    val expanded = (screenH * 0.30f).coerceAtLeast(bar * 2)
+    val rangePx = with(density) { (expanded - bar).toPx() }
+    // 0 = expanded, 1 = collapsed
+    var collapse by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(if (startExpanded) 0f else 1f) }
+    val scroll = rememberScrollState()
+
+    // dy > 0 pulls the bar open, dy < 0 pushes it closed; returns the part of dy that was used
+    fun take(dy: Float): Float {
+        val old = collapse
+        collapse = (old - dy / rangePx).coerceIn(0f, 1f)
+        return (old - collapse) * rangePx
+    }
+    suspend fun snap() {
+        val c = collapse
+        if (c > 0f && c < 1f) {
+            androidx.compose.animation.core.animate(
+                initialValue = c,
+                targetValue = if (c < 0.5f) 0f else 1f,
+                animationSpec = spring(dampingRatio = 1f, stiffness = 500f),
+            ) { v, _ -> collapse = v }
         }
     }
-    val p by animateFloatAsState(
-        targetValue = if (hidden) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
-        label = "title",
-    )
-    val collapsedHeight = if (navigation != null) 56.dp else 8.dp
+    val connection = remember(rangePx) {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPreScroll(
+                available: Offset,
+                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
+            ): Offset = if (available.y < 0f) Offset(0f, take(available.y)) else Offset.Zero
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
+            ): Offset = if (available.y > 0f) Offset(0f, take(available.y)) else Offset.Zero
+
+            override suspend fun onPostFling(
+                consumed: androidx.compose.ui.unit.Velocity,
+                available: androidx.compose.ui.unit.Velocity,
+            ): androidx.compose.ui.unit.Velocity {
+                snap()
+                return androidx.compose.ui.unit.Velocity.Zero
+            }
+        }
+    }
+    val dragState = androidx.compose.foundation.gestures.rememberDraggableState { d -> take(d) }
+
+    val bigAlpha = (1f - collapse / 0.55f).coerceIn(0f, 1f)
+    val smallAlpha = ((collapse - 0.6f) / 0.4f).coerceIn(0f, 1f)
 
     GlassBackground {
         Column(
             Modifier
                 .fillMaxSize()
-                .statusBarsPadding(),
+                .statusBarsPadding()
+                .nestedScroll(connection),
         ) {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(lerpDp(84.dp, collapsedHeight, p))
-                    .padding(horizontal = 14.dp),
-                contentAlignment = Alignment.Center,
+                    .height(lerpDp(expanded, bar, collapse))
+                    .draggable(
+                        state = dragState,
+                        orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
+                        onDragStopped = { snap() },
+                    ),
             ) {
-                if (navigation != null) {
-                    Box(Modifier.align(Alignment.CenterStart)) { navigation() }
+                // Large title, centred in the space above the bar; moves up as the bar collapses
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(lerpDp(expanded - bar, 0.dp, collapse))
+                        .graphicsLayer { alpha = bigAlpha },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (bigAlpha > 0f) {
+                        Text(
+                            text = title,
+                            color = g.text,
+                            fontSize = 32.sp,
+                            lineHeight = 38.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .padding(horizontal = 24.dp)
+                                .wrapContentHeight(unbounded = true),
+                        )
+                    }
                 }
-                Text(
-                    text = title,
-                    color = g.text,
-                    fontSize = 34.sp,
-                    lineHeight = 38.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .padding(horizontal = if (navigation != null) 52.dp else 0.dp)
-                        .graphicsLayer {
-                            val scale = 1f - 0.4f * p
-                            scaleX = scale
-                            scaleY = scale
-                            alpha = 1f - p
-                        },
-                )
+                // Bar: back button and small title
+                Row(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .height(bar)
+                        .padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (navigation != null) {
+                        navigation()
+                        Spacer(Modifier.width(10.dp))
+                    } else {
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(
+                        text = title,
+                        color = g.text,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.graphicsLayer { alpha = smallAlpha },
+                    )
+                }
             }
             Column(
                 Modifier
