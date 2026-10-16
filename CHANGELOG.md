@@ -1,14 +1,14 @@
 # 1.0.2
-- Same version number as MasterROM from now on (ROM and updater are released together)
-- One UI page titles: the large centred title shrinks smoothly into the bar while scrolling
-- Pause and resume continue byte-exactly where the download stopped; resuming within 10 minutes skips the server search
-- Download automatically over Wi-Fi, and "Install tonight" at a time you choose (iOS-style wheels), also with the app closed
-- After the restart the updater tells whether the update, kernel or picked ZIP was installed, with what's new
-- MasterROM version history with all versions and their changes
-- Install a ZIP from the storage without root, with a check: signed by MasterROM or re-signed / unsigned, version, right phone
-- Download notification: cancel while downloading; continue or cancel when paused
-- Clearer settings; link back to the MasterROM settings
-- Updater self-update: Android's install confirmation is shown again, and a failed update no longer hangs
+- Same version number as MasterROM from now on
+- One UI page titles: the large title shrinks into the bar while scrolling
+- Pause and resume continue exactly where the download stopped
+- Download automatically over Wi-Fi
+- Install tonight, at a time you choose
+- After the restart the updater tells whether the update was installed, with what's new
+- MasterROM version history
+- Install a ZIP from the storage, with a check: signed by MasterROM, version, right phone
+- Pause, continue and cancel the download from the notification
+- Clearer settings and a link to the MasterROM settings
 
 # 1.0.1
 - Cancel and delete buttons are red, pause is orange
