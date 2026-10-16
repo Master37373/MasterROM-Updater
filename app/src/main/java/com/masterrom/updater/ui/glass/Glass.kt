@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -239,5 +240,30 @@ fun InfoRow(label: String, value: String, divider: Boolean, onLongClick: (() -> 
             Text(label, color = g.text, fontSize = 16.sp)
             Text(value, color = g.subText, fontSize = 15.sp, modifier = Modifier.padding(start = 16.dp))
         }
+    }
+}
+
+/** Round glass button with an icon (settings, back). */
+@Composable
+fun GlassIconButton(
+    icon: androidx.compose.ui.graphics.painter.Painter,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val g = LocalGlass.current
+    val source = remember { MutableInteractionSource() }
+    val scale = pressScale(source)
+    Box(
+        modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .size(46.dp)
+            .clip(PillShape)
+            .background(g.glassFill)
+            .border(0.8.dp, g.glassStroke, PillShape)
+            .clickable(interactionSource = source, indication = null, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.material3.Icon(icon, contentDescription = contentDescription, tint = g.text, modifier = Modifier.size(22.dp))
     }
 }

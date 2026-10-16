@@ -65,4 +65,15 @@
     <string name="test_mode_on">Testmodus an: Der zuletzt veröffentlichte Build wird angeboten, auch wenn er älter ist.</string>
     <string name="test_mode_off">Testmodus aus</string>
     <string name="chip_test">Testmodus</string>
+    <string name="back">Zurück</string>
+    <string name="settings_download">Download</string>
+    <string name="settings_storage">Speicher</string>
+    <string name="settings_developer">Entwickler</string>
+    <string name="settings_about">Info</string>
+    <string name="stored_updates">Heruntergeladene Updates</string>
+    <string name="stored_none">Keine</string>
+    <string name="delete">Löschen</string>
+    <string name="test_mode_desc">Bietet den zuletzt veröffentlichten Build an, auch wenn er nicht neuer ist. Zum Testen von Downloads.</string>
+    <string name="app_version">App-Version</string>
+    <string name="update_source">Update-Quelle</string>
 </resources>

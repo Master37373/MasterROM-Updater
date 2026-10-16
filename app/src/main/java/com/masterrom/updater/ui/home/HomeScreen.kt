@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -63,6 +64,7 @@ import com.masterrom.updater.ui.glass.Chip
 import com.masterrom.updater.ui.glass.ChipRow
 import com.masterrom.updater.ui.glass.GlassBackground
 import com.masterrom.updater.ui.glass.GlassCard
+import com.masterrom.updater.ui.glass.GlassIconButton
 import com.masterrom.updater.ui.glass.HeroIcon
 import com.masterrom.updater.ui.glass.HeroKind
 import com.masterrom.updater.ui.glass.InfoRow
@@ -74,12 +76,11 @@ import com.masterrom.updater.ui.glass.SectionLabel
 import com.masterrom.updater.ui.theme.LocalGlass
 
 @Composable
-fun HomeScreen(vm: HomeViewModel = viewModel()) {
+fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {}) {
     val state by vm.state.collectAsStateWithLifecycle()
     val device by vm.device.collectAsStateWithLifecycle()
     val lastChecked by vm.lastChecked.collectAsStateWithLifecycle()
     val download by vm.download.collectAsStateWithLifecycle()
-    val wifiOnly by vm.wifiOnly.collectAsStateWithLifecycle()
     val testMode by vm.testMode.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val unknown = stringResource(R.string.unknown)
@@ -107,7 +108,13 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Spacer(Modifier.height(32.dp))
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
+                GlassIconButton(
+                    painterResource(R.drawable.ic_settings),
+                    contentDescription = stringResource(R.string.section_settings),
+                    onClick = onOpenSettings,
+                )
+            }
             LargeTitle(stringResource(R.string.title_software_update))
 
             // Which card is shown: the check result, or the download once one exists for the offered build.
@@ -202,15 +209,6 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                 InfoRow(stringResource(R.string.row_device), device.model + if (device.codename.isNotEmpty()) " (${device.codename})" else "", divider = true)
             }
 
-            SectionLabel(stringResource(R.string.section_settings))
-            GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 14.dp)) {
-                SwitchRow(
-                    title = stringResource(R.string.wifi_only),
-                    summary = stringResource(R.string.wifi_only_desc),
-                    checked = wifiOnly,
-                    onChange = vm::setWifiOnly,
-                )
-            }
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -341,7 +339,7 @@ private fun ButtonPair(
 }
 
 @Composable
-private fun SwitchRow(title: String, summary: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(title: String, summary: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val g = LocalGlass.current
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {

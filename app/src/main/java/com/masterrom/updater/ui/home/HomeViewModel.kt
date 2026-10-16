@@ -104,13 +104,34 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _wifiOnly.value = value
     }
 
-    /** Hidden test mode (long press on the ROM version): offers the published build even if it is older. */
+    /** Test mode (settings, or long press on the ROM version): offers the published build even if it is older. */
     fun toggleTestMode(): Boolean {
-        val on = !_testMode.value
+        setTestMode(!_testMode.value)
+        return _testMode.value
+    }
+
+    fun setTestMode(on: Boolean) {
+        if (on == _testMode.value) return
         _testMode.value = on
         prefs.edit().putBoolean(KEY_TEST_MODE, on).apply()
         check()
-        return on
+    }
+
+    private val _storedBytes = MutableStateFlow(0L)
+    /** Space used by downloaded update files. */
+    val storedBytes: StateFlow<Long> = _storedBytes.asStateFlow()
+
+    fun refreshStorage() {
+        viewModelScope.launch(Dispatchers.IO) {
+            // allocated blocks, so a half-finished (sparse) download shows its real size
+            _storedBytes.value = DownloadManager.dir(getApplication<Application>()).listFiles()
+                ?.sumOf { f -> runCatching { android.system.Os.stat(f.path).st_blocks * 512L }.getOrDefault(f.length()) } ?: 0L
+        }
+    }
+
+    fun deleteDownloads() {
+        DownloadManager.cancel(getApplication<Application>())
+        refreshStorage()
     }
 
     private companion object {
