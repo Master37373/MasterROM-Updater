@@ -27,7 +27,32 @@ object DeviceInfo {
         prop("ro.masterrom.target").ifEmpty { prop("ro.artisanrom.target") }.ifEmpty { Build.DEVICE }
     }
 
-    val model: String get() = Build.MODEL
+    /**
+     * Real device name. The ROM spoofs Build.MODEL (e.g. SM-S926B), so the name comes
+     * from the codename instead. Falls back to Build.MODEL for unknown codenames.
+     */
+    val model: String get() = deviceName(codename) ?: Build.MODEL
+
+    private val names = mapOf(
+        "x1s" to "Galaxy S20",
+        "y2s" to "Galaxy S20+",
+        "z3s" to "Galaxy S20 Ultra",
+        "c1s" to "Galaxy Note20",
+        "c2s" to "Galaxy Note20 Ultra",
+        "r8s" to "Galaxy S20 FE",
+    )
+
+    /** "y2s" / "y2slte" -> "Samsung Galaxy S20+", null if unknown. */
+    fun deviceName(codename: String): String? =
+        names[codename.lowercase().removeSuffix("lte").removeSuffix("xx")]?.let { "Samsung $it" }
+
+    /** "cip119-st3-ArtisanKRNL-v4.0.0" -> "ArtisanKRNL 4.0.0"; other kernels: text after the first '-'. */
+    fun shortKernel(release: String): String {
+        Regex("""([A-Za-z]+KRNL)-v(\d+(?:\.\d+)+)""").find(release)?.let {
+            return "${it.groupValues[1]} ${it.groupValues[2]}"
+        }
+        return release.substringAfter('-', release)
+    }
 
     /** Kernel release, e.g. "4.19.87-ArtisanKRNL-v1.2". */
     val kernel: String get() = System.getProperty("os.version") ?: ""

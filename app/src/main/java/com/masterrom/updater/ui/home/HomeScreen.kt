@@ -132,8 +132,8 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
             SectionLabel(stringResource(R.string.section_device))
             GlassCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 22.dp, vertical = 6.dp)) {
                 InfoRow(stringResource(R.string.row_rom_version), device.romVersion.ifEmpty { unknown }, divider = false)
-                InfoRow(stringResource(R.string.row_kernel), device.kernel.substringAfter('-', device.kernel).ifEmpty { unknown }, divider = true)
-                InfoRow(stringResource(R.string.row_device), listOf(device.model, device.codename).filter { it.isNotEmpty() }.joinToString(" · "), divider = true)
+                InfoRow(stringResource(R.string.row_kernel), com.masterrom.updater.data.DeviceInfo.shortKernel(device.kernel).ifEmpty { unknown }, divider = true)
+                InfoRow(stringResource(R.string.row_device), device.model + if (device.codename.isNotEmpty()) " (${device.codename})" else "", divider = true)
             }
             Spacer(Modifier.height(24.dp))
         }
@@ -153,6 +153,7 @@ private fun Body(text: String) {
 @Composable
 private fun lastCheckedText(time: Long): String =
     if (time <= 0L) stringResource(R.string.never_checked)
+    else if (System.currentTimeMillis() - time < DateUtils.MINUTE_IN_MILLIS) stringResource(R.string.last_checked, stringResource(R.string.just_now))
     else stringResource(
         R.string.last_checked,
         DateUtils.getRelativeTimeSpanString(time, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString(),

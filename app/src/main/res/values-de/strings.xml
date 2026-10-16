@@ -9,6 +9,7 @@
     <string name="installed_version">Installiert: %1$s</string>
     <string name="rom_and_device">%1$s · %2$s</string>
     <string name="last_checked">Zuletzt geprüft: %1$s</string>
+    <string name="just_now">gerade eben</string>
     <string name="never_checked">Noch nicht geprüft</string>
     <string name="check_now">Nach Updates suchen</string>
     <string name="try_again">Erneut versuchen</string>
