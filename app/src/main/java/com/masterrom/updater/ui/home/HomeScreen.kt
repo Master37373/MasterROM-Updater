@@ -314,8 +314,8 @@ private fun DownloadContent(
             Headline(stringResource(R.string.verifying))
             Body(stringResource(R.string.verifying_text))
         }
-        Phase.DONE -> if (install == InstallState.Preparing) {
-            ProgressRing(-1f)
+        Phase.DONE -> if (install is InstallState.Preparing) {
+            ProgressRing(install.progress)
             Headline(stringResource(R.string.install_preparing))
             Body(stringResource(R.string.install_preparing_text))
         } else {

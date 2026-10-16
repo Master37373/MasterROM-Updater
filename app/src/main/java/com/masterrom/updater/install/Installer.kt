@@ -38,16 +38,51 @@ object Installer {
             zip.absolutePath.startsWith("/storage/emulated/")
     }
 
-    suspend fun installWithoutRoot(context: Context, zip: File): Nothing = withContext(Dispatchers.IO) {
-        try {
-            Log.i(TAG, "installPackage: ${zip.absolutePath}")
-            android.os.RecoverySystem.installPackage(context, zip)
-        } catch (e: Exception) {
-            Log.i(TAG, "installPackage failed: $e")
-            throw InstallException(Reason.SYSTEM_FAILED, e.toString())
+    /**
+     * 1. Android's uncrypt service writes the ZIP's data in plain form to its blocks on the data
+     *    partition and records them in /cache/recovery/block.map. The recovery reads those blocks
+     *    directly, so it does not need to decrypt /data (TWRP cannot decrypt it on this ROM).
+     * 2. An OpenRecoveryScript "install @/cache/recovery/block.map" + "reboot" is written.
+     * 3. Reboot to recovery.
+     * [onProgress] gets 0..1 while uncrypt runs (takes a minute or two for 7 GB).
+     */
+    suspend fun installWithoutRoot(context: Context, zip: File, onProgress: (Float) -> Unit): Nothing =
+        withContext(Dispatchers.IO) {
+            // uncrypt only handles real /data paths, not the /storage/emulated view
+            val dataPath = File(zip.absolutePath.replaceFirst(Regex("^/storage/emulated/(\\d+)/"), "/data/media/$1/"))
+            Log.i(TAG, "processPackage: $dataPath")
+            try {
+                val listener = android.os.RecoverySystem.ProgressListener { p -> onProgress(p / 100f) }
+                android.os.RecoverySystem::class.java
+                    .getMethod("processPackage", Context::class.java, File::class.java, android.os.RecoverySystem.ProgressListener::class.java)
+                    .invoke(null, context, dataPath, listener)
+            } catch (e: Exception) {
+                val cause = (e as? java.lang.reflect.InvocationTargetException)?.targetException ?: e
+                Log.i(TAG, "processPackage failed: $cause")
+                throw InstallException(Reason.SYSTEM_FAILED, cause.toString())
+            }
+            Log.i(TAG, "block map ready: ${File(BLOCK_MAP).exists()}")
+
+            try {
+                val script = "install @$BLOCK_MAP\nreboot\n"
+                File(ORS).writeText(script)
+                File(COMMAND).writeText("boot-recovery\n--openrecoveryscript=$ORS\n")
+                Log.i(TAG, "recovery script written")
+            } catch (e: Exception) {
+                Log.i(TAG, "writing recovery script failed: $e")
+                throw InstallException(Reason.SCRIPT_FAILED, e.toString())
+            }
+
+            try {
+                context.getSystemService(android.os.PowerManager::class.java).reboot("recovery")
+            } catch (e: Exception) {
+                Log.i(TAG, "reboot failed: $e")
+                throw InstallException(Reason.REBOOT_FAILED, e.toString())
+            }
+            throw InstallException(Reason.REBOOT_FAILED, "reboot returned")
         }
-        throw InstallException(Reason.REBOOT_FAILED, "installPackage returned")
-    }
+
+    private const val BLOCK_MAP = "/cache/recovery/block.map"
 
     data class Result(val code: Int, val output: String)
 

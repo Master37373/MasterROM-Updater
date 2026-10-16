@@ -24,7 +24,8 @@ import kotlinx.coroutines.withContext
 
 sealed interface InstallState {
     data object Idle : InstallState
-    data object Preparing : InstallState
+    /** [progress] 0..1 while Android prepares the update, -1 when unknown. */
+    data class Preparing(val progress: Float = -1f) : InstallState
     data class Failed(val reason: Installer.Reason) : InstallState
 }
 
@@ -142,11 +143,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val app = getApplication<Application>()
         val zip = DownloadManager.file(app, job)
         viewModelScope.launch {
-            _install.value = InstallState.Preparing
+            _install.value = InstallState.Preparing()
             Installer.markStaged(app, job.version)
             try {
                 if (Installer.canInstallWithoutRoot(app, zip)) {
-                    Installer.installWithoutRoot(app, zip)
+                    Installer.installWithoutRoot(app, zip) { p -> _install.value = InstallState.Preparing(p) }
                 } else {
                     Installer.installAndReboot(zip)
                 }
