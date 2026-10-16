@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.Build
 import android.util.Log
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.File
 
 /**
@@ -14,6 +15,12 @@ import java.io.File
  * itself silently; otherwise Android shows its normal install confirmation.
  */
 object AppInstaller {
+    /** Confirmation screen Android wants to show; the activity in the foreground launches it. */
+    val confirm = MutableStateFlow<Intent?>(null)
+
+    /** Set when Android rejected the update (status message, may be empty). */
+    val failure = MutableStateFlow<String?>(null)
+
     fun install(context: Context, apk: File) {
         val pi = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
@@ -41,11 +48,18 @@ object AppInstaller {
 class InstallResultReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
-        Log.i("MasterROM", "self-update status $status ${intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)}")
-        if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
-            @Suppress("DEPRECATION")
-            val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return
-            context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
+        Log.i("MasterROM", "self-update status $status $message")
+        when (status) {
+            PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                @Suppress("DEPRECATION")
+                val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return
+                // A receiver may not start activities from the background (Android 10+):
+                // hand the confirmation to the visible activity instead.
+                AppInstaller.confirm.value = confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            PackageInstaller.STATUS_SUCCESS -> Unit // the app is restarted by the system
+            else -> AppInstaller.failure.value = message.orEmpty().ifEmpty { "status $status" }
         }
     }
 }

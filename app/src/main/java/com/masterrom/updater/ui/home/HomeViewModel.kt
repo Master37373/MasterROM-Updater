@@ -94,6 +94,18 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    init {
+        viewModelScope.launch {
+            com.masterrom.updater.install.AppInstaller.failure.collect { f ->
+                if (f != null) {
+                    android.util.Log.i("MasterROM", "self-update rejected: $f")
+                    _selfUpdate.value = SelfUpdateState.Failed
+                    com.masterrom.updater.install.AppInstaller.failure.value = null
+                }
+            }
+        }
+    }
+
     fun check() {
         if (_state.value == UpdateState.Checking && _device.value.codename.isEmpty()) return
         viewModelScope.launch {
@@ -257,6 +269,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 _selfUpdate.value = SelfUpdateState.Installing
                 withContext(Dispatchers.IO) { com.masterrom.updater.install.AppInstaller.install(app, apk) }
+                // no answer at all (e.g. the confirmation was dismissed): allow another try
+                delay(120_000)
+                if (_selfUpdate.value == SelfUpdateState.Installing) _selfUpdate.value = SelfUpdateState.Idle
             } catch (e: Exception) {
                 android.util.Log.i("MasterROM", "self-update failed: $e")
                 _selfUpdate.value = SelfUpdateState.Failed

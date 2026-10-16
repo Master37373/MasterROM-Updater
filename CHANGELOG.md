@@ -1,3 +1,6 @@
+# 1.0.3
+- Updater self-update: Android's install confirmation is shown again, and a failed update no longer hangs at "Installing"
+
 # 1.0.2
 - Centred page titles: they shrink and fade out while scrolling down and come back when scrolling up
 

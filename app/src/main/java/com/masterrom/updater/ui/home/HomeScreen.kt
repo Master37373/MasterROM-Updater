@@ -107,6 +107,19 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
         }
     }
 
+    // Android asks for a confirmation before the self-update: show it from the visible activity
+    val selfUpdateConfirm by com.masterrom.updater.install.AppInstaller.confirm.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(selfUpdateConfirm) {
+        selfUpdateConfirm?.let { intent ->
+            com.masterrom.updater.install.AppInstaller.confirm.value = null
+            try {
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                android.util.Log.i("MasterROM", "confirm failed: $e")
+            }
+        }
+    }
+
     CollapsingScreen(title = stringResource(R.string.title_software_update)) {
 
             // Which card is shown: the check result, or the download once one exists for the offered build.
