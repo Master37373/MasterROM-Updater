@@ -14,6 +14,11 @@
     <uses-permission android:name="android.permission.REBOOT" tools:ignore="ProtectedPermissions" />
     <!-- gives the app the "cache" group, needed to write /cache/recovery/command -->
     <uses-permission android:name="android.permission.ACCESS_CACHE_FILESYSTEM" tools:ignore="ProtectedPermissions" />
+    <!-- removes the old ArtisanROM updater that stays behind in /data/app after the switch -->
+    <uses-permission android:name="android.permission.DELETE_PACKAGES" tools:ignore="ProtectedPermissions" />
+    <queries>
+        <package android:name="com.artisan.updater" />
+    </queries>
 
     <application
         android:allowBackup="false"

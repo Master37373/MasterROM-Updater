@@ -64,6 +64,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             _device.value = withContext(Dispatchers.IO) {
                 DeviceState(DeviceInfo.romVersion, DeviceInfo.kernel, DeviceInfo.model, DeviceInfo.codename)
             }
+            withContext(Dispatchers.IO) { com.masterrom.updater.install.OldUpdater.removeIfPresent(app) }
             // the update was installed: remove the leftovers (the boot receiver usually did this already)
             val staged = Installer.stagedVersion(app)
             if (staged != null && compareVersions(DeviceInfo.romVersion, staged) >= 0) {
