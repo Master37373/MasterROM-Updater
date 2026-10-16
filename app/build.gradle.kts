@@ -42,6 +42,15 @@ android {
     }
 }
 
+// CHANGELOG.md of this repo is bundled into the app (Settings > Updater changelog)
+val changelogAssets = layout.buildDirectory.dir("generated/changelogAssets").get().asFile
+val copyChangelog = tasks.register<Copy>("copyChangelog") {
+    from(rootProject.file("CHANGELOG.md"))
+    into(changelogAssets)
+}
+android.sourceSets.getByName("main").assets.srcDir(changelogAssets)
+tasks.named("preBuild") { dependsOn(copyChangelog) }
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)

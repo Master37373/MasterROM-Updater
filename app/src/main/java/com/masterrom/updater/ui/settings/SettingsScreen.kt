@@ -54,7 +54,7 @@ import com.masterrom.updater.ui.home.SwitchRow
 import com.masterrom.updater.ui.theme.LocalGlass
 
 @Composable
-fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit) {
+fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenChangelog: () -> Unit = {}) {
     val g = LocalGlass.current
     val context = LocalContext.current
     val wifiOnly by vm.wifiOnly.collectAsStateWithLifecycle()
@@ -167,6 +167,7 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit) {
                         }
                     },
                 )
+                InfoRow(stringResource(R.string.app_changelog), "›", divider = true, onClick = onOpenChangelog)
                 InfoRow(stringResource(R.string.update_source), UpdateRepository.REPO, divider = true)
                 InfoRow(stringResource(R.string.row_device), device.codename.ifEmpty { "–" }, divider = true)
             }

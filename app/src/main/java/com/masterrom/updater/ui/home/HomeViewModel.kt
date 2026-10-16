@@ -22,6 +22,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+sealed interface SelfUpdateState {
+    data object Idle : SelfUpdateState
+    data class Downloading(val progress: Float) : SelfUpdateState
+    data object Installing : SelfUpdateState
+    data object Failed : SelfUpdateState
+}
+
 sealed interface InstallState {
     data object Idle : InstallState
     /** [progress] 0..1 while Android prepares the update, -1 when unknown. */
@@ -81,6 +88,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun check() {
         if (_state.value == UpdateState.Checking && _device.value.codename.isEmpty()) return
+        viewModelScope.launch {
+            _appRelease.value = try { com.masterrom.updater.data.AppUpdate.check() } catch (e: Exception) { null }
+        }
         viewModelScope.launch {
             _state.value = UpdateState.Checking
             val started = System.currentTimeMillis()
@@ -179,6 +189,32 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun setAutoCheck(on: Boolean) {
         com.masterrom.updater.check.UpdateCheckJob.setEnabled(getApplication<Application>(), on)
         _autoCheck.value = on
+    }
+
+    private val _appRelease = MutableStateFlow<com.masterrom.updater.data.AppRelease?>(null)
+    /** A newer version of this app, if one is published. */
+    val appRelease: StateFlow<com.masterrom.updater.data.AppRelease?> = _appRelease.asStateFlow()
+
+    private val _selfUpdate = MutableStateFlow<SelfUpdateState>(SelfUpdateState.Idle)
+    val selfUpdate: StateFlow<SelfUpdateState> = _selfUpdate.asStateFlow()
+
+    fun updateApp() {
+        val release = _appRelease.value ?: return
+        if (_selfUpdate.value is SelfUpdateState.Downloading || _selfUpdate.value == SelfUpdateState.Installing) return
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            _selfUpdate.value = SelfUpdateState.Downloading(0f)
+            try {
+                val apk = com.masterrom.updater.data.AppUpdate.download(release, app.cacheDir) { p ->
+                    _selfUpdate.value = SelfUpdateState.Downloading(p)
+                }
+                _selfUpdate.value = SelfUpdateState.Installing
+                withContext(Dispatchers.IO) { com.masterrom.updater.install.AppInstaller.install(app, apk) }
+            } catch (e: Exception) {
+                android.util.Log.i("MasterROM", "self-update failed: $e")
+                _selfUpdate.value = SelfUpdateState.Failed
+            }
+        }
     }
 
     private val _devUnlocked = MutableStateFlow(prefs.getBoolean(KEY_DEV, false))

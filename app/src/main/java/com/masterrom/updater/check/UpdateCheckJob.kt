@@ -81,8 +81,18 @@ class UpdateCheckJob : JobService() {
             Log.i(TAG, "daily update check scheduled")
         }
 
-        /** One check; notifies when a newer ROM build is published. */
+        /** One check; notifies when a newer ROM build or a newer updater is published. */
         suspend fun checkOnce(c: Context) {
+            try {
+                com.masterrom.updater.data.AppUpdate.check()?.let { app ->
+                    if (prefs(c).getString("notified_app_version", null) != app.version) {
+                        notify(c, 21, c.getString(R.string.app_update_title, app.version), c.getString(R.string.notif_app_update_text))
+                        prefs(c).edit().putString("notified_app_version", app.version).apply()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.i(TAG, "app update check failed: $e")
+            }
             val codename = DeviceInfo.codename
             val info = UpdateRepository.fetch(codename)
             val installed = DeviceInfo.romVersion
@@ -90,11 +100,11 @@ class UpdateCheckJob : JobService() {
             val rom = info.rom?.takeIf { fromArtisan || compareVersions(it.version, installed) > 0 } ?: return
             prefs(c).edit().putLong("last_check", System.currentTimeMillis()).apply()
             if (prefs(c).getString(KEY_NOTIFIED, null) == rom.version) return
-            notify(c, rom.version)
+            notify(c, NOTIF_ID, c.getString(R.string.notif_update_title, rom.version), c.getString(R.string.notif_update_text))
             prefs(c).edit().putString(KEY_NOTIFIED, rom.version).apply()
         }
 
-        private fun notify(c: Context, version: String) {
+        private fun notify(c: Context, id: Int, title: String, text: String) {
             val nm = c.getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(
                 NotificationChannel(CHANNEL, c.getString(R.string.notif_channel_updates), NotificationManager.IMPORTANCE_DEFAULT),
@@ -105,13 +115,13 @@ class UpdateCheckJob : JobService() {
             )
             val n = NotificationCompat.Builder(c, CHANNEL)
                 .setSmallIcon(R.drawable.ic_stat_download)
-                .setContentTitle(c.getString(R.string.notif_update_title, version))
-                .setContentText(c.getString(R.string.notif_update_text))
+                .setContentTitle(title)
+                .setContentText(text)
                 .setContentIntent(open)
                 .setAutoCancel(true)
                 .build()
             try {
-                nm.notify(NOTIF_ID, n)
+                nm.notify(id, n)
             } catch (e: SecurityException) {
                 Log.i(TAG, "notification not allowed: $e")
             }

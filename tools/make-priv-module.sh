@@ -24,6 +24,8 @@ cat > "$W/system/etc/permissions/privapp-permissions-com.masterrom.updater.xml" 
         <permission name="android.permission.RECOVERY" />
         <permission name="android.permission.REBOOT" />
         <permission name="android.permission.ACCESS_CACHE_FILESYSTEM" />
+        <permission name="android.permission.DELETE_PACKAGES" />
+        <permission name="android.permission.INSTALL_PACKAGES" />
     </privapp-permissions>
 </permissions>
 XML

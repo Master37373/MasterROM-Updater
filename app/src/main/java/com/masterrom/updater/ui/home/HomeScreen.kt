@@ -197,6 +197,14 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
             )
             }
 
+            // newer version of this app
+            val appRelease by vm.appRelease.collectAsStateWithLifecycle()
+            val selfUpdate by vm.selfUpdate.collectAsStateWithLifecycle()
+            appRelease?.let { release ->
+                SectionLabel(stringResource(R.string.app_update_section))
+                AppUpdateCard(release, selfUpdate, onUpdate = vm::updateApp)
+            }
+
             // "What's new" for the offered update
             val changelog by vm.changelog.collectAsStateWithLifecycle()
             val offered = (state as? UpdateState.Available)?.rom
@@ -380,6 +388,44 @@ private fun DownloadContent(
             )
         }
         Phase.IDLE -> Unit
+    }
+}
+
+@Composable
+private fun AppUpdateCard(
+    release: com.masterrom.updater.data.AppRelease,
+    state: SelfUpdateState,
+    onUpdate: () -> Unit,
+) {
+    val g = LocalGlass.current
+    GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 18.dp)) {
+        Text(
+            stringResource(R.string.app_update_title, release.version),
+            color = g.text,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Column(Modifier.padding(top = 8.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            release.changes.filter { !it.startsWith("\u00a7") }.take(4).forEach { line ->
+                Row {
+                    Text("\u2022", color = g.accent, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 10.dp))
+                    Text(line, color = g.subText, fontSize = 14.sp, lineHeight = 20.sp)
+                }
+            }
+        }
+        when (state) {
+            is SelfUpdateState.Downloading -> Text(
+                stringResource(R.string.app_update_downloading, (state.progress * 100).toInt()),
+                color = g.chipText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+            )
+            SelfUpdateState.Installing -> Text(stringResource(R.string.app_update_installing), color = g.chipText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            else -> {
+                if (state == SelfUpdateState.Failed) {
+                    Text(stringResource(R.string.app_update_failed), color = g.error, fontSize = 14.sp, modifier = Modifier.padding(bottom = 10.dp))
+                }
+                PrimaryButton(stringResource(R.string.app_update_button), onClick = onUpdate, modifier = Modifier.fillMaxWidth(), height = 48.dp)
+            }
+        }
     }
 }
 

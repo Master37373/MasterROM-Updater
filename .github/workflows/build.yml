@@ -9,9 +9,13 @@ on:
         description: 'versionName (leer = Inhalt von version.txt)'
         required: false
         default: ''
+      publish:
+        description: 'Veroeffentlichen (GitHub-Release, Handys bekommen das Update)'
+        type: boolean
+        default: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -69,3 +73,16 @@ jobs:
         with:
           name: MasterROM-Updater-${{ env.VERSION_NAME }}
           path: out/*.apk
+
+      - name: Publish release (self-update for the phones)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          # notes = the section of this version from CHANGELOG.md
+          awk -v ver="$VERSION_NAME" '/^# /{ if (p) exit; if ($2 == ver) { p = 1; next } } p' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "MasterROM Updater $VERSION_NAME" > notes.md
+          cat notes.md
+          gh release create "v$VERSION_NAME" out/*.apk \
+            --title "MasterROM Updater $VERSION_NAME" --notes-file notes.md --latest

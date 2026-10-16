@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.masterrom.updater.ui.home.HomeScreen
 import com.masterrom.updater.ui.home.HomeViewModel
+import com.masterrom.updater.ui.settings.AppChangelogScreen
 import com.masterrom.updater.ui.settings.SettingsScreen
 import com.masterrom.updater.ui.theme.MasterTheme
 
@@ -39,14 +40,15 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AppRoot() {
     val vm: HomeViewModel = viewModel()
-    var settings by rememberSaveable { mutableStateOf(false) }
-    BackHandler(enabled = settings) { settings = false }
+    // 0 = start screen, 1 = settings, 2 = updater changelog
+    var screen by rememberSaveable { mutableStateOf(0) }
+    BackHandler(enabled = screen > 0) { screen -= 1 }
 
     AnimatedContent(
-        targetState = settings,
+        targetState = screen,
         transitionSpec = {
             val duration = 380
-            if (targetState) {
+            if (targetState > initialState) {
                 (slideInHorizontally(tween(duration)) { it } + fadeIn(tween(duration))) togetherWith
                     (slideOutHorizontally(tween(duration)) { -it / 4 } + fadeOut(tween(duration)))
             } else {
@@ -55,11 +57,11 @@ private fun AppRoot() {
             }
         },
         label = "screen",
-    ) { showSettings ->
-        if (showSettings) {
-            SettingsScreen(vm, onBack = { settings = false })
-        } else {
-            HomeScreen(vm, onOpenSettings = { settings = true })
+    ) { current ->
+        when (current) {
+            2 -> AppChangelogScreen(onBack = { screen = 1 })
+            1 -> SettingsScreen(vm, onBack = { screen = 0 }, onOpenChangelog = { screen = 2 })
+            else -> HomeScreen(vm, onOpenSettings = { screen = 1 })
         }
     }
 }

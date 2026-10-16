@@ -16,6 +16,9 @@
     <uses-permission android:name="android.permission.ACCESS_CACHE_FILESYSTEM" tools:ignore="ProtectedPermissions" />
     <!-- removes the old ArtisanROM updater that stays behind in /data/app after the switch -->
     <uses-permission android:name="android.permission.DELETE_PACKAGES" tools:ignore="ProtectedPermissions" />
+    <!-- self-update: silent as system app (INSTALL_PACKAGES), otherwise with Android's confirmation -->
+    <uses-permission android:name="android.permission.INSTALL_PACKAGES" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <queries>
         <package android:name="com.artisan.updater" />
     </queries>
@@ -47,6 +50,10 @@
             android:name=".check.UpdateCheckJob"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <receiver
+            android:name=".install.InstallResultReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".install.BootReceiver"

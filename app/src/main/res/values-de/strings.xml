@@ -104,4 +104,14 @@
     <string name="show_less">Weniger anzeigen</string>
     <string name="auto_check">Automatisch nach Updates suchen</string>
     <string name="auto_check_desc">Einmal täglich, mit Benachrichtigung, wenn ein Update da ist.</string>
+    <string name="app_changelog">Updater-Änderungen</string>
+    <string name="version_x">Version %1$s</string>
+    <string name="installed_chip">Installiert</string>
+    <string name="app_update_section">Updater-Update</string>
+    <string name="app_update_title">MasterROM Updater %1$s</string>
+    <string name="app_update_button">App aktualisieren</string>
+    <string name="app_update_downloading">Wird heruntergeladen… %1$d%%</string>
+    <string name="app_update_installing">Wird installiert… die App startet gleich neu.</string>
+    <string name="app_update_failed">Das Update konnte nicht installiert werden. Bitte erneut versuchen.</string>
+    <string name="notif_app_update_text">Eine neue Version des Updaters ist verfügbar.</string>
 </resources>
