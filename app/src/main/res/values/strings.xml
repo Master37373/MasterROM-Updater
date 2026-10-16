@@ -76,4 +76,11 @@
     <string name="test_mode_desc">Offers the latest published build even if it is not newer. For testing downloads.</string>
     <string name="app_version">App version</string>
     <string name="update_source">Update source</string>
+    <string name="dev_hide">Hide developer options</string>
+    <string name="dev_already">Developer options are already on.</string>
+    <string name="dev_unlocked">Developer options are now on.</string>
+    <plurals name="dev_taps_left">
+        <item quantity="one">%d more tap to turn on developer options.</item>
+        <item quantity="other">%d more taps to turn on developer options.</item>
+    </plurals>
 </resources>

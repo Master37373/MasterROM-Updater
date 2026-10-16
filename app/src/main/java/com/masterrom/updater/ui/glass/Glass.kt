@@ -22,6 +22,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -214,7 +221,13 @@ fun ChipRow(content: @Composable () -> Unit) {
 /** Label / value row inside a card, with an optional divider above. */
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
-fun InfoRow(label: String, value: String, divider: Boolean, onLongClick: (() -> Unit)? = null) {
+fun InfoRow(
+    label: String,
+    value: String,
+    divider: Boolean,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+) {
     val g = LocalGlass.current
     Column {
         if (divider) Box(Modifier.fillMaxWidth().height(1.dp).background(g.divider))
@@ -222,11 +235,11 @@ fun InfoRow(label: String, value: String, divider: Boolean, onLongClick: (() -> 
             Modifier
                 .fillMaxWidth()
                 .then(
-                    if (onLongClick != null) {
+                    if (onClick != null || onLongClick != null) {
                         Modifier.combinedClickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = {},
+                            onClick = onClick ?: {},
                             onLongClick = onLongClick,
                         )
                     } else {
@@ -257,13 +270,116 @@ fun GlassIconButton(
     Box(
         modifier
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .size(46.dp)
+            .size(44.dp)
             .clip(PillShape)
-            .background(g.glassFill)
-            .border(0.8.dp, g.glassStroke, PillShape)
+            .background(if (g.dark) Color.White.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.78f))
+            .border(1.dp, if (g.dark) Color.White.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.07f), PillShape)
             .clickable(interactionSource = source, indication = null, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        androidx.compose.material3.Icon(icon, contentDescription = contentDescription, tint = g.text, modifier = Modifier.size(22.dp))
+        androidx.compose.material3.Icon(icon, contentDescription = contentDescription, tint = g.text, modifier = Modifier.size(24.dp))
+    }
+}
+
+private val ToolbarHeight = 60.dp
+private val ExpandedTitleHeight = 150.dp
+
+/**
+ * One UI style screen: a large title that scrolls away and shrinks into a small pinned toolbar
+ * title. [navigation] (back button) and [actions] (settings button) stay in the toolbar.
+ */
+@Composable
+fun CollapsingScreen(
+    title: String,
+    navigation: (@Composable () -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {},
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val g = LocalGlass.current
+    val scroll = rememberScrollState()
+    val density = LocalDensity.current
+    val collapseRange = with(density) { (ExpandedTitleHeight - 24.dp).toPx() }
+    val progress = (scroll.value / collapseRange).coerceIn(0f, 1f)
+
+    GlassBackground {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(scroll)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Spacer(Modifier.height(ToolbarHeight - 14.dp))
+            Box(Modifier.fillMaxWidth().height(ExpandedTitleHeight), contentAlignment = Alignment.BottomStart) {
+                Text(
+                    text = title,
+                    color = g.text,
+                    fontSize = 36.sp,
+                    lineHeight = 40.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .padding(start = 12.dp, end = 12.dp, bottom = 10.dp)
+                        .graphicsLayer {
+                            val p = progress
+                            alpha = (1f - p * 1.4f).coerceIn(0f, 1f)
+                            translationY = scroll.value * 0.5f
+                            scaleX = 1f - 0.12f * p
+                            scaleY = 1f - 0.12f * p
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 1f)
+                        },
+                )
+            }
+            content()
+            Spacer(Modifier.height(24.dp))
+        }
+
+        // pinned toolbar
+        val barAlpha = ((progress - 0.55f) / 0.45f).coerceIn(0f, 1f)
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(g.base.copy(alpha = 0.92f * barAlpha), g.base.copy(alpha = 0.70f * barAlpha)),
+                    ),
+                ),
+        ) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .height(ToolbarHeight)
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                navigation?.invoke()
+                Text(
+                    text = title,
+                    color = g.text,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = if (navigation != null) 10.dp else 12.dp)
+                        .graphicsLayer {
+                            alpha = barAlpha
+                            translationY = (1f - barAlpha) * 12.dp.toPx()
+                        },
+                )
+                actions()
+            }
+            if (barAlpha > 0f) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(g.divider.copy(alpha = g.divider.alpha * barAlpha)),
+                )
+            }
+        }
     }
 }

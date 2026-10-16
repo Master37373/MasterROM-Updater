@@ -76,4 +76,11 @@
     <string name="test_mode_desc">Bietet den zuletzt veröffentlichten Build an, auch wenn er nicht neuer ist. Zum Testen von Downloads.</string>
     <string name="app_version">App-Version</string>
     <string name="update_source">Update-Quelle</string>
+    <string name="dev_hide">Entwickleroptionen ausblenden</string>
+    <string name="dev_already">Entwickleroptionen sind bereits aktiviert.</string>
+    <string name="dev_unlocked">Entwickleroptionen sind jetzt aktiviert.</string>
+    <plurals name="dev_taps_left">
+        <item quantity="one">Noch %d Tippen bis zu den Entwickleroptionen.</item>
+        <item quantity="other">Noch %d Mal tippen bis zu den Entwickleroptionen.</item>
+    </plurals>
 </resources>

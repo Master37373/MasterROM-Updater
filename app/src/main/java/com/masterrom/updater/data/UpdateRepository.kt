@@ -44,7 +44,22 @@ object UpdateRepository {
     private const val BASE = "https://raw.githubusercontent.com/$REPO/refs/heads/main/updater/v2/"
     private const val USER_AGENT = "MasterROMUpdater/1.0"
 
-    suspend fun fetch(codename: String): UpdateInfo = withContext(Dispatchers.IO) {
+    /**
+     * Loads the update info for [codename]. In test mode updater/v2/test.xml is used when it
+     * exists, so downloads can be tested with any build without publishing it.
+     */
+    suspend fun fetch(codename: String, test: Boolean = false): UpdateInfo {
+        if (test) {
+            try {
+                return fetchFile("test")
+            } catch (e: NoDeviceException) {
+                // no test.xml: fall back to the device file
+            }
+        }
+        return fetchFile(codename)
+    }
+
+    private suspend fun fetchFile(codename: String): UpdateInfo = withContext(Dispatchers.IO) {
         val conn = (URL("$BASE$codename.xml").openConnection() as HttpURLConnection).apply {
             connectTimeout = 15_000
             readTimeout = 20_000

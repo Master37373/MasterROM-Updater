@@ -1,6 +1,17 @@
 package com.masterrom.updater.ui.settings
 
 import android.text.format.Formatter
+import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.masterrom.updater.ui.glass.CollapsingScreen
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -51,24 +62,19 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit) {
     val stored by vm.storedBytes.collectAsStateWithLifecycle()
     val download by vm.download.collectAsStateWithLifecycle()
     val device by vm.device.collectAsStateWithLifecycle()
+    val devUnlocked by vm.devUnlocked.collectAsStateWithLifecycle()
+    var taps by remember { mutableIntStateOf(0) }
+    var toast by remember { mutableStateOf<Toast?>(null) }
     val busy = download.phase == Phase.RUNNING || download.phase == Phase.PREPARING || download.phase == Phase.VERIFYING
 
     LaunchedEffect(download.phase) { vm.refreshStorage() }
 
-    GlassBackground {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                GlassIconButton(painterResource(R.drawable.ic_back), contentDescription = stringResource(R.string.back), onClick = onBack)
-            }
-            LargeTitle(stringResource(R.string.section_settings))
+    CollapsingScreen(
+        title = stringResource(R.string.section_settings),
+        navigation = {
+            GlassIconButton(painterResource(R.drawable.ic_back), contentDescription = stringResource(R.string.back), onClick = onBack)
+        },
+    ) {
 
             SectionLabel(stringResource(R.string.settings_download))
             GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 14.dp)) {
@@ -98,23 +104,65 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit) {
                 }
             }
 
-            SectionLabel(stringResource(R.string.settings_developer))
-            GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 14.dp)) {
-                SwitchRow(
-                    title = stringResource(R.string.chip_test),
-                    summary = stringResource(R.string.test_mode_desc),
-                    checked = testMode,
-                    onChange = vm::setTestMode,
-                )
+            AnimatedVisibility(
+                visible = devUnlocked,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    SectionLabel(stringResource(R.string.settings_developer))
+                    GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 14.dp)) {
+                        SwitchRow(
+                            title = stringResource(R.string.chip_test),
+                            summary = stringResource(R.string.test_mode_desc),
+                            checked = testMode,
+                            onChange = vm::setTestMode,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        SecondaryButton(
+                            stringResource(R.string.dev_hide),
+                            onClick = {
+                                vm.setDevUnlocked(false)
+                                taps = 0
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            height = 44.dp,
+                        )
+                    }
+                }
             }
 
             SectionLabel(stringResource(R.string.settings_about))
             GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 6.dp)) {
-                InfoRow(stringResource(R.string.app_version), BuildConfig.VERSION_NAME, divider = false)
+                InfoRow(
+                    stringResource(R.string.app_version),
+                    BuildConfig.VERSION_NAME,
+                    divider = false,
+                    onClick = {
+                        if (devUnlocked) {
+                            toast?.cancel()
+                            toast = Toast.makeText(context, R.string.dev_already, Toast.LENGTH_SHORT).also { it.show() }
+                        } else {
+                            taps++
+                            val left = DEV_TAPS - taps
+                            toast?.cancel()
+                            if (left <= 0) {
+                                vm.setDevUnlocked(true)
+                                toast = Toast.makeText(context, R.string.dev_unlocked, Toast.LENGTH_SHORT).also { it.show() }
+                            } else if (left <= 4) {
+                                toast = Toast.makeText(
+                                    context,
+                                    context.resources.getQuantityString(R.plurals.dev_taps_left, left, left),
+                                    Toast.LENGTH_SHORT,
+                                ).also { it.show() }
+                            }
+                        }
+                    },
+                )
                 InfoRow(stringResource(R.string.update_source), UpdateRepository.REPO, divider = true)
                 InfoRow(stringResource(R.string.row_device), device.codename.ifEmpty { "–" }, divider = true)
             }
-            Spacer(Modifier.height(24.dp))
-        }
     }
 }
+
+private const val DEV_TAPS = 7

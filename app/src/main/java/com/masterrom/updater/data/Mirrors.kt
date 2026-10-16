@@ -1,5 +1,6 @@
 package com.masterrom.updater.data
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -30,6 +31,7 @@ object Mirrors {
     )
 
     private const val USER_AGENT = "Wget/1.21.4"
+    private const val TAG = "MasterROM"
     private const val PROBE_TIMEOUT = 7_000
 
     suspend fun resolve(urls: List<String>, size: Long, max: Int = 6): List<Mirror> = withContext(Dispatchers.IO) {
@@ -39,7 +41,9 @@ object Mirrors {
             if (m != null) {
                 val project = m.groupValues[1]
                 val path = m.groupValues[2]
-                followSourceForge(u.trim())?.let { candidates.putIfAbsent(it, hostLabel(it)) }
+                val chosen = followSourceForge(u.trim())
+                Log.i(TAG, "sourceforge redirect: $chosen")
+                chosen?.let { candidates.putIfAbsent(it, hostLabel(it)) }
                 for (h in SF_HOSTS) {
                     candidates.putIfAbsent("https://$h.dl.sourceforge.net/project/$project/$path?viasf=1", h)
                 }
@@ -50,6 +54,8 @@ object Mirrors {
         val probed = coroutineScope {
             candidates.map { (url, name) -> async { probe(url, size)?.let { ms -> Triple(url, name, ms) } } }.awaitAll()
         }
+        probed.forEach { Log.i(TAG, "mirror ${it?.second ?: "-"}: ${it?.third ?: "unusable"} ms") }
+        Log.i(TAG, "candidates=${candidates.size} usable=${probed.count { it != null }}")
         probed.filterNotNull()
             .sortedBy { it.third }
             .distinctBy { it.second }
@@ -101,12 +107,16 @@ object Mirrors {
             return null
         }
         return try {
-            if (conn.responseCode != 206) return null
+            val code = conn.responseCode
             val total = conn.getHeaderField("Content-Range")?.substringAfterLast('/')?.trim()?.toLongOrNull()
-            if (size > 0 && total != size) return null
+            if (code != 206 || (size > 0 && total != size)) {
+                Log.i(TAG, "probe ${hostLabel(url)}: HTTP $code size=$total expected=$size")
+                return null
+            }
             conn.inputStream.use { it.read() }
             (System.nanoTime() - started) / 1_000_000
         } catch (e: Exception) {
+            Log.i(TAG, "probe ${hostLabel(url)}: ${e.javaClass.simpleName} ${e.message}")
             null
         } finally {
             conn.disconnect()

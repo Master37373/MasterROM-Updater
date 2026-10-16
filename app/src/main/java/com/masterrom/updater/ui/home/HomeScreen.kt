@@ -62,6 +62,7 @@ import com.masterrom.updater.download.DownloadManager
 import com.masterrom.updater.download.Phase
 import com.masterrom.updater.ui.glass.Chip
 import com.masterrom.updater.ui.glass.ChipRow
+import com.masterrom.updater.ui.glass.CollapsingScreen
 import com.masterrom.updater.ui.glass.GlassBackground
 import com.masterrom.updater.ui.glass.GlassCard
 import com.masterrom.updater.ui.glass.GlassIconButton
@@ -98,24 +99,16 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
         }
     }
 
-    GlassBackground {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
-                GlassIconButton(
-                    painterResource(R.drawable.ic_settings),
-                    contentDescription = stringResource(R.string.section_settings),
-                    onClick = onOpenSettings,
-                )
-            }
-            LargeTitle(stringResource(R.string.title_software_update))
+    CollapsingScreen(
+        title = stringResource(R.string.title_software_update),
+        actions = {
+            GlassIconButton(
+                painterResource(R.drawable.ic_settings),
+                contentDescription = stringResource(R.string.section_settings),
+                onClick = onOpenSettings,
+            )
+        },
+    ) {
 
             // Which card is shown: the check result, or the download once one exists for the offered build.
             val avail = state as? UpdateState.Available
@@ -200,17 +193,11 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
                     stringResource(R.string.row_rom_version),
                     device.romVersion.ifEmpty { unknown },
                     divider = false,
-                    onLongClick = {
-                        val on = vm.toggleTestMode()
-                        Toast.makeText(context, if (on) R.string.test_mode_on else R.string.test_mode_off, Toast.LENGTH_LONG).show()
-                    },
                 )
                 InfoRow(stringResource(R.string.row_kernel), DeviceInfo.shortKernel(device.kernel).ifEmpty { unknown }, divider = true)
                 InfoRow(stringResource(R.string.row_device), device.model + if (device.codename.isNotEmpty()) " (${device.codename})" else "", divider = true)
             }
 
-            Spacer(Modifier.height(24.dp))
-        }
     }
 
     if (confirmCancel) {

@@ -67,7 +67,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             val started = System.currentTimeMillis()
             val result = try {
                 val d = _device.value
-                val info = UpdateRepository.fetch(d.codename)
+                val info = UpdateRepository.fetch(d.codename, test = _testMode.value)
                 val rom = info.rom?.takeIf { _testMode.value || compareVersions(it.version, d.romVersion) > 0 }
                 rom?.let { withContext(Dispatchers.IO) { DownloadManager.restore(getApplication<Application>(), DownloadJob.from(it)) } }
                 val kernel = info.kernel?.takeIf { k ->
@@ -117,6 +117,16 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         check()
     }
 
+    private val _devUnlocked = MutableStateFlow(prefs.getBoolean(KEY_DEV, false))
+    /** Developer options are hidden until "App version" in the settings is tapped 7 times. */
+    val devUnlocked: StateFlow<Boolean> = _devUnlocked.asStateFlow()
+
+    fun setDevUnlocked(on: Boolean) {
+        _devUnlocked.value = on
+        prefs.edit().putBoolean(KEY_DEV, on).apply()
+        if (!on) setTestMode(false)
+    }
+
     private val _storedBytes = MutableStateFlow(0L)
     /** Space used by downloaded update files. */
     val storedBytes: StateFlow<Long> = _storedBytes.asStateFlow()
@@ -136,6 +146,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private companion object {
         const val KEY_TEST_MODE = "test_mode"
+        const val KEY_DEV = "dev_unlocked"
         const val KEY_LAST_CHECK = "last_check"
         const val MIN_CHECK_MS = 900L
     }
