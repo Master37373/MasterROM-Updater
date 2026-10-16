@@ -10,6 +10,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -76,6 +78,7 @@ import com.masterrom.updater.ui.glass.PrimaryButton
 import com.masterrom.updater.ui.glass.ProgressRing
 import com.masterrom.updater.ui.glass.SecondaryButton
 import com.masterrom.updater.ui.glass.SectionLabel
+import com.masterrom.updater.ui.glass.TintButton
 import com.masterrom.updater.ui.theme.LocalGlass
 
 @Composable
@@ -194,6 +197,14 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
             )
             }
 
+            // "What's new" for the offered update
+            val changelog by vm.changelog.collectAsStateWithLifecycle()
+            val offered = (state as? UpdateState.Available)?.rom
+            if (offered != null && changelog.isNotEmpty()) {
+                SectionLabel(stringResource(R.string.whats_new) + " · " + offered.version)
+                ChangelogCard(changelog)
+            }
+
             SectionLabel(stringResource(R.string.section_device))
             GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 6.dp)) {
                 InfoRow(
@@ -276,7 +287,7 @@ private fun DownloadContent(
             ProgressRing(-1f)
             Headline(stringResource(R.string.searching_servers))
             Body("MasterROM ${rom.version} · ${sizeOf(rom.size)}")
-            SecondaryButton(stringResource(R.string.cancel), onClick = onCancel)
+            TintButton(stringResource(R.string.cancel), g.error, onClick = onCancel)
         }
         Phase.RUNNING -> {
             ProgressRing(dl.progress, caption = stringResource(R.string.downloading))
@@ -372,6 +383,43 @@ private fun DownloadContent(
     }
 }
 
+/** Bullet list of the changelog, collapsed to the first lines with a "show all" toggle. */
+@Composable
+private fun ChangelogCard(lines: List<String>) {
+    val g = LocalGlass.current
+    var expanded by remember { mutableStateOf(false) }
+    val collapsedCount = 6
+    val shown = if (expanded) lines else lines.take(collapsedCount)
+    GlassCard(
+        modifier = Modifier.animateContentSize(),
+        padding = PaddingValues(horizontal = 22.dp, vertical = 18.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            shown.forEach { line ->
+                if (line.startsWith("§")) {
+                    Text(line.removePrefix("§"), color = g.text, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                } else {
+                    Row {
+                        Text("•", color = g.accent, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 10.dp))
+                        Text(line, color = g.subText, fontSize = 15.sp, lineHeight = 21.sp)
+                    }
+                }
+            }
+            if (lines.size > collapsedCount) {
+                Text(
+                    stringResource(if (expanded) R.string.show_less else R.string.show_all),
+                    color = g.chipText,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .clickable { expanded = !expanded },
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun ButtonPair(
     secondary: String,
@@ -380,10 +428,13 @@ private fun ButtonPair(
     onPrimary: () -> Unit,
     primaryIsGlass: Boolean = false,
 ) {
+    val g = LocalGlass.current
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        SecondaryButton(secondary, onClick = onSecondary, modifier = Modifier.weight(1f), height = 52.dp)
+        // cancel / delete is always red
+        TintButton(secondary, g.error, onClick = onSecondary, modifier = Modifier.weight(1f))
         if (primaryIsGlass) {
-            SecondaryButton(primary, onClick = onPrimary, modifier = Modifier.weight(1f), height = 52.dp)
+            // pause is orange
+            TintButton(primary, g.warning, onClick = onPrimary, modifier = Modifier.weight(1f))
         } else {
             PrimaryButton(primary, onClick = onPrimary, modifier = Modifier.weight(1f), height = 52.dp)
         }

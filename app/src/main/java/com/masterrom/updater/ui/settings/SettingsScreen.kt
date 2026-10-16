@@ -58,6 +58,7 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit) {
     val g = LocalGlass.current
     val context = LocalContext.current
     val wifiOnly by vm.wifiOnly.collectAsStateWithLifecycle()
+    val autoCheck by vm.autoCheck.collectAsStateWithLifecycle()
     val testMode by vm.testMode.collectAsStateWithLifecycle()
     val stored by vm.storedBytes.collectAsStateWithLifecycle()
     val download by vm.download.collectAsStateWithLifecycle()
@@ -78,6 +79,13 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit) {
 
             SectionLabel(stringResource(R.string.settings_download))
             GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 14.dp)) {
+                SwitchRow(
+                    title = stringResource(R.string.auto_check),
+                    summary = stringResource(R.string.auto_check_desc),
+                    checked = autoCheck,
+                    onChange = vm::setAutoCheck,
+                )
+                Spacer(Modifier.height(16.dp))
                 SwitchRow(
                     title = stringResource(R.string.wifi_only),
                     summary = stringResource(R.string.wifi_only_desc),

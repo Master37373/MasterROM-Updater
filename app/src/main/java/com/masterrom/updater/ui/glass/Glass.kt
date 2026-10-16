@@ -352,3 +352,23 @@ fun CollapsingScreen(
 }
 
 private fun lerpDp(a: Dp, b: Dp, t: Float): Dp = a + (b - a) * t
+
+/** Pill button tinted in [color] (red for cancel/delete, orange for pause). */
+@Composable
+fun TintButton(text: String, color: Color, onClick: () -> Unit, modifier: Modifier = Modifier, height: Dp = 52.dp) {
+    val g = LocalGlass.current
+    val source = remember { MutableInteractionSource() }
+    val scale = pressScale(source)
+    Box(
+        modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .height(height)
+            .clip(PillShape)
+            .background(color.copy(alpha = if (g.dark) 0.20f else 0.13f))
+            .border(1.dp, color.copy(alpha = 0.45f), PillShape)
+            .clickable(interactionSource = source, indication = null, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = color, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 20.dp))
+    }
+}

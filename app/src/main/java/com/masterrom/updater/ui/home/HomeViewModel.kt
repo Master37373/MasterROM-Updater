@@ -65,6 +65,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 DeviceState(DeviceInfo.romVersion, DeviceInfo.kernel, DeviceInfo.model, DeviceInfo.codename)
             }
             withContext(Dispatchers.IO) { com.masterrom.updater.install.OldUpdater.removeIfPresent(app) }
+            com.masterrom.updater.check.UpdateCheckJob.schedule(app)
             // the update was installed: remove the leftovers (the boot receiver usually did this already)
             val staged = Installer.stagedVersion(app)
             if (staged != null && compareVersions(DeviceInfo.romVersion, staged) >= 0) {
@@ -91,6 +92,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 val fromArtisan = DeviceInfo.prop("ro.masterrom.version").isEmpty()
                 val rom = info.rom?.takeIf { _testMode.value || fromArtisan || compareVersions(it.version, d.romVersion) > 0 }
                 rom?.let { withContext(Dispatchers.IO) { DownloadManager.restore(getApplication<Application>(), DownloadJob.from(it)) } }
+                rom?.let { r -> viewModelScope.launch { _changelog.value = com.masterrom.updater.data.Changelog.forVersion(r.version) } }
                 val kernel = info.kernel?.takeIf { k ->
                     val installed = Regex("ArtisanKRNL-v(\\d+(?:\\.\\d+)+)").find(d.kernel)?.groupValues?.get(1)
                     installed != null && compareVersions(k.version, installed) > 0
@@ -165,6 +167,18 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissInstallError() {
         _install.value = InstallState.Idle
+    }
+
+    private val _changelog = MutableStateFlow<List<String>>(emptyList())
+    /** "What's new" lines for the offered ROM update (lines starting with § are sub-headings). */
+    val changelog: StateFlow<List<String>> = _changelog.asStateFlow()
+
+    private val _autoCheck = MutableStateFlow(com.masterrom.updater.check.UpdateCheckJob.isEnabled(app))
+    val autoCheck: StateFlow<Boolean> = _autoCheck.asStateFlow()
+
+    fun setAutoCheck(on: Boolean) {
+        com.masterrom.updater.check.UpdateCheckJob.setEnabled(getApplication<Application>(), on)
+        _autoCheck.value = on
     }
 
     private val _devUnlocked = MutableStateFlow(prefs.getBoolean(KEY_DEV, false))

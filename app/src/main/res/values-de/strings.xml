@@ -96,4 +96,12 @@
     <string name="err_script">Das Recovery-Skript konnte nicht geschrieben werden.</string>
     <string name="err_reboot">Das Handy konnte nicht in die Recovery neu starten. Starte TWRP von Hand und installiere /data/media/TWRP/ota_update.zip.</string>
     <string name="err_system">Das System konnte die Installation nicht starten.</string>
+    <string name="notif_channel_updates">Update-Benachrichtigungen</string>
+    <string name="notif_update_title">MasterROM %1$s ist verfügbar</string>
+    <string name="notif_update_text">Tippen, um das Update herunterzuladen.</string>
+    <string name="whats_new">Was ist neu</string>
+    <string name="show_all">Alle anzeigen</string>
+    <string name="show_less">Weniger anzeigen</string>
+    <string name="auto_check">Automatisch nach Updates suchen</string>
+    <string name="auto_check_desc">Einmal täglich, mit Benachrichtigung, wenn ein Update da ist.</string>
 </resources>
