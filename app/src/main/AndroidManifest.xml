@@ -12,6 +12,8 @@
     <!-- granted only when the updater is a privileged system app (MasterROM ships it as priv-app) -->
     <uses-permission android:name="android.permission.RECOVERY" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.REBOOT" tools:ignore="ProtectedPermissions" />
+    <!-- gives the app the "cache" group, needed to write /cache/recovery/command -->
+    <uses-permission android:name="android.permission.ACCESS_CACHE_FILESYSTEM" tools:ignore="ProtectedPermissions" />
 
     <application
         android:allowBackup="false"
