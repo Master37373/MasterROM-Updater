@@ -16,6 +16,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -99,22 +100,14 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
         }
     }
 
-    CollapsingScreen(
-        title = stringResource(R.string.title_software_update),
-        actions = {
-            GlassIconButton(
-                painterResource(R.drawable.ic_settings),
-                contentDescription = stringResource(R.string.section_settings),
-                onClick = onOpenSettings,
-            )
-        },
-    ) {
+    CollapsingScreen(title = stringResource(R.string.title_software_update)) {
 
             // Which card is shown: the check result, or the download once one exists for the offered build.
             val avail = state as? UpdateState.Available
             val dlForOffer = avail?.rom != null && download.job?.version == avail.rom.version && download.phase != Phase.IDLE
             val cardKey: Any = if (dlForOffer) "dl-${download.phase}" else state::class
 
+            Box(Modifier.fillMaxWidth()) {
             AnimatedContent(
                 targetState = cardKey,
                 transitionSpec = {
@@ -185,6 +178,15 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
                         }
                     }
                 }
+            }
+
+            // settings button in the top right corner of the status card
+            GlassIconButton(
+                painterResource(R.drawable.ic_settings),
+                contentDescription = stringResource(R.string.section_settings),
+                onClick = onOpenSettings,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp),
+            )
             }
 
             SectionLabel(stringResource(R.string.section_device))

@@ -23,11 +23,15 @@ data class Mirror(val url: String, val name: String)
 object Mirrors {
     private val SF = Regex("""https?://(?:www\.)?sourceforge\.net/projects/([^/]+)/files/(.+?)/download/?$""")
 
-    /** Known SourceForge mirrors, European ones first. Unreachable ones are dropped by the probe. */
+    /**
+     * Known SourceForge mirrors, European ones first. SourceForge only serves signed links, so each
+     * mirror is requested through downloads.sourceforge.net with ?use_mirror=, which hands out a
+     * signed link for that mirror. Mirrors that are gone or do not have the file yet are dropped.
+     */
     private val SF_HOSTS = listOf(
-        "netix", "altushost-swe", "freefr", "kumisystems", "deac-fra", "deac-ams", "deac-riga",
-        "netcologne", "onboardcloud", "unlimited", "phoenixnap", "cfhcable", "gigenet",
-        "liquidtelecom", "zenlayer", "master",
+        "netix", "altushost-swe", "deac-fra", "deac-ams", "deac-riga", "unlimited", "onboardcloud",
+        "phoenixnap", "cfhcable", "gigenet", "zenlayer", "netactuate", "pilotfiber", "versaweb",
+        "psychz", "cytranet", "ixpeering", "excellmedia", "tenet", "razaoinfo", "jaist", "nchc",
     )
 
     private const val USER_AGENT = "Wget/1.21.4"
@@ -41,12 +45,11 @@ object Mirrors {
             if (m != null) {
                 val project = m.groupValues[1]
                 val path = m.groupValues[2]
-                val chosen = followSourceForge(u.trim())
-                Log.i(TAG, "sourceforge redirect: $chosen")
-                chosen?.let { candidates.putIfAbsent(it, hostLabel(it)) }
-                for (h in SF_HOSTS) {
-                    candidates.putIfAbsent("https://$h.dl.sourceforge.net/project/$project/$path?viasf=1", h)
-                }
+                val starts = listOf(u.trim()) +
+                    SF_HOSTS.map { h -> "https://downloads.sourceforge.net/project/$project/$path?use_mirror=$h" }
+                val signed = coroutineScope { starts.map { async { followSourceForge(it) } }.awaitAll() }
+                signed.filterNotNull().forEach { candidates.putIfAbsent(it, hostLabel(it)) }
+                Log.i(TAG, "sourceforge: ${signed.count { it != null }} of ${starts.size} mirror links")
             } else {
                 candidates.putIfAbsent(u.trim(), hostLabel(u))
             }
@@ -54,7 +57,7 @@ object Mirrors {
         val probed = coroutineScope {
             candidates.map { (url, name) -> async { probe(url, size)?.let { ms -> Triple(url, name, ms) } } }.awaitAll()
         }
-        probed.forEach { Log.i(TAG, "mirror ${it?.second ?: "-"}: ${it?.third ?: "unusable"} ms") }
+        probed.filterNotNull().forEach { Log.i(TAG, "mirror ${it.second}: ${it.third} ms") }
         Log.i(TAG, "candidates=${candidates.size} usable=${probed.count { it != null }}")
         probed.filterNotNull()
             .sortedBy { it.third }

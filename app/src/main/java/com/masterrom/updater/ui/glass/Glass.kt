@@ -281,105 +281,74 @@ fun GlassIconButton(
     }
 }
 
-private val ToolbarHeight = 60.dp
-private val ExpandedTitleHeight = 150.dp
-
 /**
- * One UI style screen: a large title that scrolls away and shrinks into a small pinned toolbar
- * title. [navigation] (back button) and [actions] (settings button) stay in the toolbar.
+ * Screen with a large One UI title at the top. When the content is scrolled, the title shrinks
+ * with a spring animation and stays at the top (no toolbar bar); scrolled back to the top it
+ * grows again. [navigation] (back button) sits left of the title.
  */
 @Composable
 fun CollapsingScreen(
     title: String,
     navigation: (@Composable () -> Unit)? = null,
-    actions: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val g = LocalGlass.current
     val scroll = rememberScrollState()
     val density = LocalDensity.current
-    val collapseRange = with(density) { (ExpandedTitleHeight - 24.dp).toPx() }
-    val progress = (scroll.value / collapseRange).coerceIn(0f, 1f)
+    val threshold = with(density) { 8.dp.toPx() }
+    val collapsed = scroll.value > threshold
+    val p by animateFloatAsState(
+        targetValue = if (collapsed) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+        label = "title",
+    )
 
     GlassBackground {
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(scroll)
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Spacer(Modifier.height(ToolbarHeight - 14.dp))
-            Box(Modifier.fillMaxWidth().height(ExpandedTitleHeight), contentAlignment = Alignment.BottomStart) {
-                Text(
-                    text = title,
-                    color = g.text,
-                    fontSize = 36.sp,
-                    lineHeight = 40.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .padding(start = 12.dp, end = 12.dp, bottom = 10.dp)
-                        .graphicsLayer {
-                            val p = progress
-                            alpha = (1f - p * 1.4f).coerceIn(0f, 1f)
-                            translationY = scroll.value * 0.5f
-                            scaleX = 1f - 0.12f * p
-                            scaleY = 1f - 0.12f * p
-                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 1f)
-                        },
-                )
-            }
-            content()
-            Spacer(Modifier.height(24.dp))
-        }
-
-        // pinned toolbar
-        val barAlpha = ((progress - 0.55f) / 0.45f).coerceIn(0f, 1f)
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(g.base.copy(alpha = 0.92f * barAlpha), g.base.copy(alpha = 0.70f * barAlpha)),
-                    ),
-                ),
+                .statusBarsPadding(),
         ) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .statusBarsPadding()
-                    .height(ToolbarHeight)
-                    .padding(horizontal = 14.dp),
+                    .height(lerpDp(84.dp, 56.dp, p))
+                    .padding(start = 14.dp, end = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 navigation?.invoke()
                 Text(
                     text = title,
                     color = g.text,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontSize = 34.sp,
+                    lineHeight = 38.sp,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     modifier = Modifier
-                        .weight(1f)
-                        .padding(start = if (navigation != null) 10.dp else 12.dp)
+                        .padding(start = if (navigation != null) 12.dp else 12.dp)
                         .graphicsLayer {
-                            alpha = barAlpha
-                            translationY = (1f - barAlpha) * 12.dp.toPx()
+                            val scale = 1f - 0.38f * p
+                            scaleX = scale
+                            scaleY = scale
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
                         },
                 )
-                actions()
             }
-            if (barAlpha > 0f) {
-                Box(
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(g.divider.copy(alpha = g.divider.alpha * barAlpha)),
-                )
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(scroll)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Spacer(Modifier.height(2.dp))
+                content()
+                Spacer(Modifier.height(24.dp))
             }
         }
     }
 }
+
+private fun lerpDp(a: Dp, b: Dp, t: Float): Dp = a + (b - a) * t
