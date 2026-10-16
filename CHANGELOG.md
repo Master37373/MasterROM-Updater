@@ -1,3 +1,10 @@
+# 1.2.0
+- "Looking for something else?": link back to the MasterROM settings
+- More about this device: One UI and Android version, security patch, build number
+- Download notification: cancel while downloading; continue or cancel when paused (also with the app closed)
+- The time of the night install can be chosen in the settings
+- After installing a picked ZIP the updater tells whether it worked (ROM and kernel ZIPs)
+
 # 1.1.1
 - Clearer settings: short texts, rows with dividers, tap anywhere on a row to switch it; "Wi-Fi only" is now "Use mobile data"
 

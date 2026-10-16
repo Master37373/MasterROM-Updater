@@ -67,6 +67,7 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenChangelog: () ->
     val device by vm.device.collectAsStateWithLifecycle()
     val devUnlocked by vm.devUnlocked.collectAsStateWithLifecycle()
     val autoDownload by vm.autoDownload.collectAsStateWithLifecycle()
+    val nightMinutes by vm.nightMinutes.collectAsStateWithLifecycle()
     val localZip by vm.localZip.collectAsStateWithLifecycle()
     var confirmLocal by remember { mutableStateOf(false) }
     val pickZip = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -106,6 +107,27 @@ fun SettingsScreen(vm: HomeViewModel, onBack: () -> Unit, onOpenChangelog: () ->
                     summary = stringResource(R.string.mobile_data_desc),
                     checked = !wifiOnly,
                     onChange = { vm.setWifiOnly(!it) },
+                )
+                val nightLabel = remember(nightMinutes) {
+                    val cal = java.util.Calendar.getInstance().apply {
+                        set(java.util.Calendar.HOUR_OF_DAY, nightMinutes / 60)
+                        set(java.util.Calendar.MINUTE, nightMinutes % 60)
+                    }
+                    android.text.format.DateFormat.getTimeFormat(context).format(cal.time)
+                }
+                InfoRow(
+                    stringResource(R.string.night_time),
+                    nightLabel,
+                    divider = true,
+                    onClick = {
+                        android.app.TimePickerDialog(
+                            context,
+                            { _, h, m -> vm.setNightMinutes(h * 60 + m) },
+                            nightMinutes / 60,
+                            nightMinutes % 60,
+                            android.text.format.DateFormat.is24HourFormat(context),
+                        ).show()
+                    },
                 )
             }
 

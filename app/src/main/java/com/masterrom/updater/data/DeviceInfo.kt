@@ -50,6 +50,24 @@ object DeviceInfo {
     fun shortKernel(release: String): String =
         KernelVersion.label(release) ?: release.substringAfter('-', release)
 
+    /** "One UI 8.5" from ro.build.version.oneui (80500), empty when unknown. */
+    val oneUi: String by lazy {
+        prop("ro.build.version.oneui").toIntOrNull()?.takeIf { it > 0 }?.let { v ->
+            val major = v / 10000
+            val minor = (v % 10000) / 100
+            "One UI $major" + if (minor > 0) ".$minor" else ""
+        } ?: ""
+    }
+
+    /** Android version, e.g. "16". */
+    val android: String get() = Build.VERSION.RELEASE
+
+    /** Security patch level, e.g. "2026-10-01". */
+    val securityPatch: String get() = Build.VERSION.SECURITY_PATCH
+
+    /** Build number as shown in Samsung's software information. */
+    val buildNumber: String get() = Build.DISPLAY
+
     /** Kernel release, e.g. "4.19.87-ArtisanKRNL-v1.2". */
     val kernel: String get() = System.getProperty("os.version") ?: ""
 }

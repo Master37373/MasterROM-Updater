@@ -22,8 +22,19 @@ object Schedule {
     private const val TAG = "MasterROM"
     const val ACTION_DOWNLOAD = "com.masterrom.updater.action.AUTO_DOWNLOAD"
     const val ACTION_INSTALL = "com.masterrom.updater.action.NIGHT_INSTALL"
-    /** Hour of the night install (local time). */
+    /** Default time of the night install (local time); can be changed in the settings. */
     const val NIGHT_HOUR = 2
+    private const val KEY_NIGHT_MINUTES = "night_install_minutes"
+
+    /** Time of day of the night install in minutes after midnight. */
+    fun nightMinutes(c: Context): Int = prefs(c).getInt(KEY_NIGHT_MINUTES, NIGHT_HOUR * 60)
+
+    /** Changes the time; a night install that is already planned moves to the new time. */
+    fun setNightMinutes(c: Context, minutes: Int) {
+        prefs(c).edit().putInt(KEY_NIGHT_MINUTES, minutes.coerceIn(0, 24 * 60 - 1)).apply()
+        val job = loadJob(c)
+        if (nightInstallAt(c) > 0L && job != null && job.version == nightInstallVersion(c)) planNightInstall(c, job)
+    }
 
     private const val KEY_AUTO_DOWNLOAD = "auto_download"
     private const val KEY_NIGHT_AT = "night_install_at"
@@ -61,7 +72,7 @@ object Schedule {
 
     /** Plans the install of the downloaded [job] for the coming night. Returns the time. */
     fun planNightInstall(c: Context, job: DownloadJob): Long {
-        val at = nextNight(System.currentTimeMillis())
+        val at = nextNight(c, System.currentTimeMillis())
         saveJob(c, job)
         prefs(c).edit().putLong(KEY_NIGHT_AT, at).putString(KEY_NIGHT_VERSION, job.version).apply()
         setAlarm(c, ACTION_INSTALL, at)
@@ -81,12 +92,13 @@ object Schedule {
         if (at > System.currentTimeMillis()) setAlarm(c, ACTION_INSTALL, at) else cancelNightInstall(c)
     }
 
-    /** Next [NIGHT_HOUR]:00 after [now]. */
-    fun nextNight(now: Long): Long {
+    /** Next occurrence of the night install time after [now]. */
+    fun nextNight(c: Context, now: Long): Long {
+        val m = nightMinutes(c)
         val cal = Calendar.getInstance().apply {
             timeInMillis = now
-            set(Calendar.HOUR_OF_DAY, NIGHT_HOUR)
-            set(Calendar.MINUTE, 0)
+            set(Calendar.HOUR_OF_DAY, m / 60)
+            set(Calendar.MINUTE, m % 60)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }

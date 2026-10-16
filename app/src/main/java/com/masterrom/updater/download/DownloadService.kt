@@ -51,6 +51,7 @@ class DownloadService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
+                NotificationActionReceiver.cancelPaused(this)
                 val job = DownloadManager.pendingJob
                 startForeground(NOTIF_ID, buildProgress(DownloadManager.state.value), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
                 if (job == null) {
@@ -217,6 +218,9 @@ class DownloadService : Service() {
     private fun finish() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+        // paused (by the user, no Wi-Fi, time limit): a notification to continue or cancel from there
+        val s = DownloadManager.state.value
+        if (s.phase == Phase.PAUSED && s.job != null) NotificationActionReceiver.notifyPaused(this, s)
     }
 
     override fun onDestroy() {
@@ -267,6 +271,7 @@ class DownloadService : Service() {
                     .setContentText(text)
                     .setProgress(1000, (s.progress * 1000).toInt(), false)
                     .addAction(0, getString(R.string.pause), servicePending(ACTION_PAUSE, 1))
+                    .addAction(0, getString(R.string.cancel), NotificationActionReceiver.pending(this, NotificationActionReceiver.ACTION_CANCEL))
             }
             else -> b.setContentTitle(getString(R.string.notif_downloading, version)).setProgress(0, 0, true)
         }

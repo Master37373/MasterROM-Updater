@@ -115,6 +115,8 @@ object DownloadManager {
 
     fun start(context: Context, job: DownloadJob) {
         pendingJob = job
+        // remembered, so the download can be continued from the notification after the app was closed
+        com.masterrom.updater.schedule.Schedule.saveJob(context, job)
         _state.value = DlState(Phase.PREPARING, job, _state.value.takeIf { it.job == job }?.done ?: 0, job.size)
         ContextCompat.startForegroundService(context, Intent(context, DownloadService::class.java).setAction(DownloadService.ACTION_START))
     }
@@ -127,6 +129,7 @@ object DownloadManager {
 
     /** Stops the download and deletes everything that was downloaded for it. */
     fun cancel(context: Context) {
+        NotificationActionReceiver.cancelPaused(context)
         val job = _state.value.job
         if (DownloadService.running) {
             context.startService(Intent(context, DownloadService::class.java).setAction(DownloadService.ACTION_CANCEL))

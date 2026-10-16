@@ -64,6 +64,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".download.NotificationActionReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".install.InstallResultReceiver"
             android:exported="false" />
 

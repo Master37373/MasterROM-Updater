@@ -168,4 +168,15 @@
     <string name="local_err_device">Diese ZIP ist nicht für dieses Handy.</string>
     <string name="mobile_data">Mobile Daten verwenden</string>
     <string name="mobile_data_desc">Downloads auch ohne WLAN (mehrere GB)</string>
+    <string name="notif_paused">MasterROM %1$s pausiert</string>
+    <string name="notif_waiting_wifi">MasterROM %1$s wartet auf WLAN</string>
+    <string name="night_time">Uhrzeit der nächtlichen Installation</string>
+    <string name="post_local_title">ZIP installiert: %1$s</string>
+    <string name="post_local_unknown_text">Das Handy wurde nach der Installation neu gestartet. Ob es bei dieser ZIP geklappt hat, kann der Updater nicht prüfen.</string>
+    <string name="post_failed_local_text">Das Handy läuft nicht mit der Version aus der ZIP: Die Installation in TWRP ist fehlgeschlagen oder wurde abgebrochen.</string>
+    <string name="row_system">System</string>
+    <string name="row_patch">Sicherheitspatch</string>
+    <string name="row_build">Build-Nummer</string>
+    <string name="looking_else">Suche nach etwas anderem?</string>
+    <string name="link_masterrom_settings">MasterROM-Einstellungen</string>
 </resources>

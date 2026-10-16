@@ -345,6 +345,17 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _nightAt.value = com.masterrom.updater.schedule.Schedule.planNightInstall(getApplication<Application>(), job)
     }
 
+    private val _nightMinutes = MutableStateFlow(com.masterrom.updater.schedule.Schedule.nightMinutes(app))
+    /** Time of day of the night install, minutes after midnight. */
+    val nightMinutes: StateFlow<Int> = _nightMinutes.asStateFlow()
+
+    fun setNightMinutes(minutes: Int) {
+        val app = getApplication<Application>()
+        com.masterrom.updater.schedule.Schedule.setNightMinutes(app, minutes)
+        _nightMinutes.value = com.masterrom.updater.schedule.Schedule.nightMinutes(app)
+        _nightAt.value = com.masterrom.updater.schedule.Schedule.nightInstallAt(app)
+    }
+
     fun cancelNightInstall() {
         com.masterrom.updater.schedule.Schedule.cancelNightInstall(getApplication<Application>())
         _nightAt.value = 0L
@@ -420,9 +431,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun installLocalZip() {
         val zip = localFile ?: return
+        val ready = _localZip.value as? LocalZipState.Ready ?: return
         val app = getApplication<Application>()
         viewModelScope.launch {
             _localZip.value = LocalZipState.Preparing()
+            com.masterrom.updater.install.PostUpdate.markLocal(app, ready.check.kind, ready.check.version, ready.name)
             try {
                 if (Installer.canInstallWithoutRoot(app, zip)) {
                     Installer.installWithoutRoot(app, zip) { p -> _localZip.value = LocalZipState.Preparing(p) }
@@ -431,6 +444,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 }
             } catch (e: Exception) {
                 android.util.Log.i("MasterROM", "local zip install failed: $e")
+                com.masterrom.updater.install.PostUpdate.clearLocal(app)
                 _localZip.value = LocalZipState.Failed(null)
             }
         }

@@ -252,6 +252,23 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {},
                 )
                 InfoRow(stringResource(R.string.row_kernel), DeviceInfo.shortKernel(device.kernel).ifEmpty { unknown }, divider = true)
                 InfoRow(stringResource(R.string.row_device), device.model + if (device.codename.isNotEmpty()) " (${device.codename})" else "", divider = true)
+                val system = listOf(DeviceInfo.oneUi, "Android " + DeviceInfo.android).filter { it.isNotBlank() }.joinToString(" · ")
+                InfoRow(stringResource(R.string.row_system), system, divider = true)
+                InfoRow(stringResource(R.string.row_patch), patchDate(DeviceInfo.securityPatch).ifEmpty { unknown }, divider = true)
+                InfoRow(stringResource(R.string.row_build), DeviceInfo.buildNumber.ifEmpty { unknown }, divider = true)
+            }
+
+            // like Samsung's "Looking for something else?": the way back to the MasterROM settings
+            GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 18.dp)) {
+                Text(stringResource(R.string.looking_else), color = LocalGlass.current.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    stringResource(R.string.link_masterrom_settings),
+                    color = LocalGlass.current.chipText,
+                    fontSize = 15.sp,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .clickable { openMasterRomSettings(context) },
+                )
             }
 
     }
@@ -436,7 +453,7 @@ private fun DownloadContent(
             // Samsung-style "install tonight"
             Text(
                 if (nightAt > 0L) stringResource(R.string.night_cancel)
-                else stringResource(R.string.night_install, nightTime(com.masterrom.updater.schedule.Schedule.nextNight(System.currentTimeMillis()))),
+                else stringResource(R.string.night_install, nightTime(com.masterrom.updater.schedule.Schedule.nextNight(LocalContext.current, System.currentTimeMillis()))),
                 color = g.chipText,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -699,22 +716,33 @@ private fun PostUpdateCard(
     onOpenHistory: () -> Unit,
 ) {
     val g = LocalGlass.current
-    val ok = r.kind == com.masterrom.updater.install.PostUpdate.Kind.ROM_OK ||
-        r.kind == com.masterrom.updater.install.PostUpdate.Kind.KERNEL_OK
+    val ok = com.masterrom.updater.install.PostUpdate.isOk(r)
+    val unknown = r.kind == com.masterrom.updater.install.PostUpdate.Kind.LOCAL_UNKNOWN
     val isRom = r.kind == com.masterrom.updater.install.PostUpdate.Kind.ROM_OK ||
         r.kind == com.masterrom.updater.install.PostUpdate.Kind.ROM_FAILED
+    val isLocal = r.kind == com.masterrom.updater.install.PostUpdate.Kind.LOCAL_OK ||
+        r.kind == com.masterrom.updater.install.PostUpdate.Kind.LOCAL_FAILED || unknown
     val label = com.masterrom.updater.install.PostUpdate.label(r)
     GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 18.dp)) {
         Text(
-            stringResource(if (ok) R.string.post_ok_title else R.string.post_failed_title, label),
-            color = if (ok) g.text else g.error,
+            stringResource(
+                when {
+                    unknown -> R.string.post_local_title
+                    ok -> R.string.post_ok_title
+                    else -> R.string.post_failed_title
+                },
+                label,
+            ),
+            color = if (ok || unknown) g.text else g.error,
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
         )
         Text(
             stringResource(
                 when {
+                    unknown -> R.string.post_local_unknown_text
                     ok -> R.string.post_ok_text
+                    isLocal -> R.string.post_failed_local_text
                     isRom -> R.string.post_failed_text
                     else -> R.string.post_failed_kernel_text
                 },
@@ -741,5 +769,23 @@ private fun PostUpdateCard(
             }
             PrimaryButton(stringResource(R.string.ok), onClick = onDismiss, modifier = Modifier.weight(1f), height = 46.dp)
         }
+    }
+}
+
+/** "2026-10-01" -> "1. Oktober 2026" in the phone's language. */
+private fun patchDate(patch: String): String = try {
+    val d = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(patch)
+    if (d == null) patch else java.text.DateFormat.getDateInstance(java.text.DateFormat.LONG).format(d)
+} catch (e: Exception) {
+    patch
+}
+
+/** Opens Settings > MasterROM (an exported activity added by the ROM's settings mod); falls back to Settings. */
+private fun openMasterRomSettings(context: android.content.Context) {
+    val page = android.content.Intent().setClassName("com.android.settings", "com.android.settings.Settings\$UnicaSettingsActivity")
+    try {
+        context.startActivity(page)
+    } catch (e: Exception) {
+        runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS)) }
     }
 }
