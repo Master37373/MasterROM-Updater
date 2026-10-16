@@ -46,13 +46,9 @@ object DeviceInfo {
     fun deviceName(codename: String): String? =
         names[codename.lowercase().removeSuffix("lte").removeSuffix("xx")]?.let { "Samsung $it" }
 
-    /** "cip119-st3-ArtisanKRNL-v4.0.0" -> "ArtisanKRNL 4.0.0"; other kernels: text after the first '-'. */
-    fun shortKernel(release: String): String {
-        Regex("""([A-Za-z]+KRNL)-v(\d+(?:\.\d+)+)""").find(release)?.let {
-            return "${it.groupValues[1]} ${it.groupValues[2]}"
-        }
-        return release.substringAfter('-', release)
-    }
+    /** "…-ArtisanKRNL-v4.0.1-mr812.1" -> "ArtisanKRNL 4.0.1 · mr812.1"; other kernels: text after the first '-'. */
+    fun shortKernel(release: String): String =
+        KernelVersion.label(release) ?: release.substringAfter('-', release)
 
     /** Kernel release, e.g. "4.19.87-ArtisanKRNL-v1.2". */
     val kernel: String get() = System.getProperty("os.version") ?: ""

@@ -114,4 +114,10 @@
     <string name="app_update_installing">Wird installiert… die App startet gleich neu.</string>
     <string name="app_update_failed">Das Update konnte nicht installiert werden. Bitte erneut versuchen.</string>
     <string name="notif_app_update_text">Eine neue Version des Updaters ist verfügbar.</string>
+    <string name="kernel_install_button">Kernel installieren</string>
+    <string name="kernel_install_title">Kernel %1$s installieren?</string>
+    <string name="kernel_install_text">Das Handy startet in TWRP neu, flasht den neuen Kernel und startet danach von selbst wieder. Das dauert etwa eine Minute. Apps und Daten bleiben erhalten.</string>
+    <string name="kernel_failed">Der Kernel konnte nicht installiert werden. Bitte erneut versuchen.</string>
+    <string name="notif_kernel_title">Kernel %1$s ist verfügbar</string>
+    <string name="notif_kernel_text">Tippen, um das Kernel-Update zu installieren.</string>
 </resources>

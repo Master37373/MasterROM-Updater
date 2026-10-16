@@ -29,6 +29,14 @@ sealed interface SelfUpdateState {
     data object Failed : SelfUpdateState
 }
 
+sealed interface KernelState {
+    data object Idle : KernelState
+    data class Downloading(val progress: Float) : KernelState
+    /** [progress] 0..1 while Android prepares the install, -1 when unknown. */
+    data class Preparing(val progress: Float = -1f) : KernelState
+    data object Failed : KernelState
+}
+
 sealed interface InstallState {
     data object Idle : InstallState
     /** [progress] 0..1 while Android prepares the update, -1 when unknown. */
@@ -103,14 +111,17 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 val rom = info.rom?.takeIf { _testMode.value || fromArtisan || compareVersions(it.version, d.romVersion) > 0 }
                 rom?.let { withContext(Dispatchers.IO) { DownloadManager.restore(getApplication<Application>(), DownloadJob.from(it)) } }
                 rom?.let { r -> viewModelScope.launch { _changelog.value = com.masterrom.updater.data.Changelog.forVersion(r.version) } }
+                // A ROM update brings its own kernel, so a kernel update is only offered on its own.
                 val kernel = info.kernel?.takeIf { k ->
-                    val installed = Regex("ArtisanKRNL-v(\\d+(?:\\.\\d+)+)").find(d.kernel)?.groupValues?.get(1)
-                    installed != null && compareVersions(k.version, installed) > 0
+                    rom == null && k.link.isNotEmpty() &&
+                        (_testMode.value || com.masterrom.updater.data.KernelVersion.isNewer(k.version, d.kernel))
                 }
+                _kernel.value = kernel
+                if (kernel == null && _kernelState.value == KernelState.Failed) _kernelState.value = KernelState.Idle
                 val now = System.currentTimeMillis()
                 prefs.edit().putLong(KEY_LAST_CHECK, now).apply()
                 _lastChecked.value = now
-                if (rom != null || kernel != null) UpdateState.Available(rom, kernel) else UpdateState.UpToDate
+                if (rom != null) UpdateState.Available(rom, null) else UpdateState.UpToDate
             } catch (e: NoDeviceException) {
                 UpdateState.Failed(noDevice = true, detail = e.codename)
             } catch (e: Exception) {
@@ -177,6 +188,39 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissInstallError() {
         _install.value = InstallState.Idle
+    }
+
+    private val _kernel = MutableStateFlow<KernelUpdate?>(null)
+    /** A newer kernel build, offered when there is no ROM update. */
+    val kernel: StateFlow<KernelUpdate?> = _kernel.asStateFlow()
+
+    private val _kernelState = MutableStateFlow<KernelState>(KernelState.Idle)
+    val kernelState: StateFlow<KernelState> = _kernelState.asStateFlow()
+
+    /** Downloads the kernel zip, then installs it through TWRP like a ROM update (phone reboots). */
+    fun installKernel() {
+        val k = _kernel.value ?: return
+        if (_kernelState.value is KernelState.Downloading || _kernelState.value is KernelState.Preparing) return
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            _kernelState.value = KernelState.Downloading(0f)
+            val dir = DownloadManager.dir(app)
+            try {
+                val zip = com.masterrom.updater.data.KernelDownload.download(k, dir) { p ->
+                    _kernelState.value = KernelState.Downloading(p)
+                }
+                _kernelState.value = KernelState.Preparing()
+                if (Installer.canInstallWithoutRoot(app, zip)) {
+                    Installer.installWithoutRoot(app, zip) { p -> _kernelState.value = KernelState.Preparing(p) }
+                } else {
+                    Installer.installAndReboot(zip)
+                }
+            } catch (e: Exception) {
+                android.util.Log.i("MasterROM", "kernel install failed: $e")
+                withContext(Dispatchers.IO) { com.masterrom.updater.data.KernelDownload.deleteAll(dir) }
+                _kernelState.value = KernelState.Failed
+            }
+        }
     }
 
     private val _changelog = MutableStateFlow<List<String>>(emptyList())

@@ -92,6 +92,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
     val unknown = stringResource(R.string.unknown)
     var confirmCancel by remember { mutableStateOf(false) }
     var confirmInstall by remember { mutableStateOf(false) }
+    var confirmKernel by remember { mutableStateOf(false) }
     val installState by vm.install.collectAsStateWithLifecycle()
 
     // Notifications are optional: the download starts whether or not the permission is granted.
@@ -168,9 +169,6 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
                                         if (testMode) Chip(stringResource(R.string.chip_test), LocalGlass.current.warning)
                                         Spacer(Modifier.height(4.dp))
                                         PrimaryButton(stringResource(R.string.download), onClick = startDownload, modifier = Modifier.fillMaxWidth())
-                                    } else if (s.kernel != null) {
-                                        Headline(stringResource(R.string.kernel_update_available))
-                                        Text(s.kernel.version, color = LocalGlass.current.text, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
                                     }
                                 }
                                 is UpdateState.Failed -> {
@@ -203,6 +201,14 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
             appRelease?.let { release ->
                 SectionLabel(stringResource(R.string.app_update_section))
                 AppUpdateCard(release, selfUpdate, onUpdate = vm::updateApp)
+            }
+
+            // newer kernel build (only when there is no ROM update, which brings its own kernel)
+            val kernel by vm.kernel.collectAsStateWithLifecycle()
+            val kernelState by vm.kernelState.collectAsStateWithLifecycle()
+            kernel?.let { k ->
+                SectionLabel(stringResource(R.string.kernel_update_available))
+                KernelUpdateCard(k, device.kernel, kernelState, onInstall = { confirmKernel = true })
             }
 
             // "What's new" for the offered update
@@ -251,6 +257,35 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
             },
             dismissButton = {
                 TextButton(onClick = { confirmInstall = false }) { Text(stringResource(R.string.cancel_no)) }
+            },
+            shape = RoundedCornerShape(28.dp),
+        )
+    }
+
+    if (confirmKernel) {
+        val k = vm.kernel.collectAsStateWithLifecycle().value
+        val battery = remember { batteryLevel(context) }
+        val lowBattery = battery.first < 30 && !battery.second
+        AlertDialog(
+            onDismissRequest = { confirmKernel = false },
+            title = {
+                Text(stringResource(R.string.kernel_install_title, k?.let { com.masterrom.updater.data.KernelVersion.label(it.version) ?: it.version }.orEmpty()))
+            },
+            text = {
+                Text(
+                    if (lowBattery) stringResource(R.string.install_battery_low, battery.first)
+                    else stringResource(R.string.kernel_install_text),
+                )
+            },
+            confirmButton = {
+                if (!lowBattery) {
+                    TextButton(onClick = { confirmKernel = false; vm.installKernel() }) {
+                        Text(stringResource(R.string.install_confirm))
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmKernel = false }) { Text(stringResource(R.string.cancel_no)) }
             },
             shape = RoundedCornerShape(28.dp),
         )
@@ -424,6 +459,66 @@ private fun AppUpdateCard(
                     Text(stringResource(R.string.app_update_failed), color = g.error, fontSize = 14.sp, modifier = Modifier.padding(bottom = 10.dp))
                 }
                 PrimaryButton(stringResource(R.string.app_update_button), onClick = onUpdate, modifier = Modifier.fillMaxWidth(), height = 48.dp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun KernelUpdateCard(
+    kernel: com.masterrom.updater.data.KernelUpdate,
+    installed: String,
+    state: KernelState,
+    onInstall: () -> Unit,
+) {
+    val g = LocalGlass.current
+    val context = LocalContext.current
+    GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 18.dp)) {
+        Text(
+            com.masterrom.updater.data.KernelVersion.label(kernel.version) ?: kernel.version,
+            color = g.text,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            stringResource(R.string.installed_version, DeviceInfo.shortKernel(installed).ifEmpty { stringResource(R.string.unknown) }),
+            color = g.subText,
+            fontSize = 14.sp,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+        if (kernel.size > 0 || kernel.date.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            ChipRow {
+                if (kernel.size > 0) Chip(Formatter.formatShortFileSize(context, kernel.size))
+                if (kernel.date.isNotEmpty()) Chip(kernel.date)
+            }
+        }
+        if (kernel.changes.isNotEmpty()) {
+            Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                kernel.changes.take(5).forEach { line ->
+                    Row {
+                        Text("\u2022", color = g.accent, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 10.dp))
+                        Text(line, color = g.subText, fontSize = 14.sp, lineHeight = 20.sp)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        when (state) {
+            is KernelState.Downloading -> Text(
+                stringResource(R.string.app_update_downloading, (state.progress * 100).toInt()),
+                color = g.chipText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+            )
+            is KernelState.Preparing -> Text(
+                stringResource(R.string.install_preparing) +
+                    if (state.progress >= 0f) " ${(state.progress * 100).toInt()}%" else "",
+                color = g.chipText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+            )
+            else -> {
+                if (state == KernelState.Failed) {
+                    Text(stringResource(R.string.kernel_failed), color = g.error, fontSize = 14.sp, modifier = Modifier.padding(bottom = 10.dp))
+                }
+                PrimaryButton(stringResource(R.string.kernel_install_button), onClick = onInstall, modifier = Modifier.fillMaxWidth(), height = 48.dp)
             }
         }
     }

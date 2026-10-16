@@ -28,6 +28,7 @@ data class KernelUpdate(
     val size: Long,
     val link: String,
     val channel: String,
+    val changes: List<String> = emptyList(),
 )
 
 data class UpdateInfo(val rom: RomUpdate?, val kernel: KernelUpdate?)
@@ -88,6 +89,7 @@ object UpdateRepository {
         val rom = HashMap<String, String>()
         val kernel = HashMap<String, String>()
         val romUrls = ArrayList<String>()
+        val kernelChanges = ArrayList<String>()
         var tag: String? = null
 
         var event = parser.eventType
@@ -103,7 +105,11 @@ object UpdateRepository {
                     if (text.isNotEmpty() && t != null) {
                         when (section) {
                             "rom" -> if (t == "url" || t == "link" || Regex("part\\d*").matches(t)) romUrls += text else rom[t] = text
-                            "kernel" -> kernel[t] = text
+                            "kernel" -> when {
+                                t == "change" -> kernelChanges += text
+                                Regex("part\\d*").matches(t) -> kernel.putIfAbsent("link", text)
+                                else -> kernel[t] = text
+                            }
                         }
                     }
                 }
@@ -137,6 +143,7 @@ object UpdateRepository {
                 size = kernel["size"]?.toLongOrNull() ?: 0L,
                 link = kernel["link"] ?: kernel["url"].orEmpty(),
                 channel = kernel["channel"].orEmpty(),
+                changes = kernelChanges,
             )
         }
         return UpdateInfo(romUpdate, kernelUpdate)

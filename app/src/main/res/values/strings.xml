@@ -114,4 +114,10 @@
     <string name="app_update_installing">Installing… the app restarts in a moment.</string>
     <string name="app_update_failed">The update could not be installed. Please try again.</string>
     <string name="notif_app_update_text">A new version of the updater is available.</string>
+    <string name="kernel_install_button">Install kernel</string>
+    <string name="kernel_install_title">Install kernel %1$s?</string>
+    <string name="kernel_install_text">The phone restarts into TWRP, flashes the new kernel and then starts again on its own. This takes about a minute. Your apps and data are kept.</string>
+    <string name="kernel_failed">The kernel could not be installed. Please try again.</string>
+    <string name="notif_kernel_title">Kernel %1$s is available</string>
+    <string name="notif_kernel_text">Tap to install the kernel update.</string>
 </resources>

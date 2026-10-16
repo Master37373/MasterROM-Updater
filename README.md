@@ -18,6 +18,7 @@ The update app of [MasterROM](https://github.com/Master37373/MasterROM) for the 
 - Installs ROM updates **without root**: the ZIP is stored in `/data/ota_package`, Android's
   `uncrypt` makes it readable for the recovery, TWRP installs it through an OpenRecoveryScript
 - "What's new" from the ROM changelog, own changelog for the app
+- Kernel updates (ArtisanKRNL built by the MasterROM kernel workflow), installed the same way
 - Updates itself (GitHub releases of this repository)
 - Wi-Fi only option, storage overview, hidden developer options (tap "App version" 7 times)
 

@@ -54,6 +54,7 @@ class UpdateCheckJob : JobService() {
         private const val NOTIF_ID = 20
         private const val KEY_AUTO = "auto_check"
         private const val KEY_NOTIFIED = "notified_version"
+        private const val KEY_NOTIFIED_KERNEL = "notified_kernel_version"
 
         private fun prefs(c: Context) = c.getSharedPreferences("updater", Context.MODE_PRIVATE)
 
@@ -97,7 +98,18 @@ class UpdateCheckJob : JobService() {
             val info = UpdateRepository.fetch(codename)
             val installed = DeviceInfo.romVersion
             val fromArtisan = DeviceInfo.prop("ro.masterrom.version").isEmpty()
-            val rom = info.rom?.takeIf { fromArtisan || compareVersions(it.version, installed) > 0 } ?: return
+            val rom = info.rom?.takeIf { fromArtisan || compareVersions(it.version, installed) > 0 }
+            if (rom == null) {
+                val k = info.kernel?.takeIf {
+                    it.link.isNotEmpty() && com.masterrom.updater.data.KernelVersion.isNewer(it.version, DeviceInfo.kernel)
+                } ?: return
+                prefs(c).edit().putLong("last_check", System.currentTimeMillis()).apply()
+                if (prefs(c).getString(KEY_NOTIFIED_KERNEL, null) == k.version) return
+                val label = com.masterrom.updater.data.KernelVersion.label(k.version) ?: k.version
+                notify(c, 22, c.getString(R.string.notif_kernel_title, label), c.getString(R.string.notif_kernel_text))
+                prefs(c).edit().putString(KEY_NOTIFIED_KERNEL, k.version).apply()
+                return
+            }
             prefs(c).edit().putLong("last_check", System.currentTimeMillis()).apply()
             if (prefs(c).getString(KEY_NOTIFIED, null) == rom.version) return
             notify(c, NOTIF_ID, c.getString(R.string.notif_update_title, rom.version), c.getString(R.string.notif_update_text))
