@@ -1,3 +1,6 @@
+# 1.0.2
+- Centred page titles: they shrink and fade out while scrolling down and come back when scrolling up
+
 # 1.0.1
 - Cancel and delete buttons are red, pause is orange
 - "What's new" for ROM updates, taken from the MasterROM changelog

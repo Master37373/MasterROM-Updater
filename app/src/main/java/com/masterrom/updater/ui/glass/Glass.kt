@@ -38,6 +38,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -282,9 +286,9 @@ fun GlassIconButton(
 }
 
 /**
- * Screen with a large One UI title at the top. When the content is scrolled, the title shrinks
- * with a spring animation and stays at the top (no toolbar bar); scrolled back to the top it
- * grows again. [navigation] (back button) sits left of the title.
+ * Screen with a large, centred One UI title at the top (no toolbar bar). Scrolling down shrinks
+ * the title and fades it out; scrolling up (or reaching the top again) brings it back.
+ * [navigation] (back button) stays at the left edge.
  */
 @Composable
 fun CollapsingScreen(
@@ -296,12 +300,25 @@ fun CollapsingScreen(
     val scroll = rememberScrollState()
     val density = LocalDensity.current
     val threshold = with(density) { 8.dp.toPx() }
-    val collapsed = scroll.value > threshold
+    val jitter = with(density) { 4.dp.toPx() }
+    var hidden by remember { mutableStateOf(false) }
+    LaunchedEffect(scroll) {
+        var last = 0
+        snapshotFlow { scroll.value }.collect { v ->
+            when {
+                v <= threshold -> hidden = false
+                v - last > jitter -> hidden = true   // scrolling down
+                last - v > jitter -> hidden = false  // scrolling up
+            }
+            if (kotlin.math.abs(v - last) > jitter || v <= threshold) last = v
+        }
+    }
     val p by animateFloatAsState(
-        targetValue = if (collapsed) 1f else 0f,
+        targetValue = if (hidden) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
         label = "title",
     )
+    val collapsedHeight = if (navigation != null) 56.dp else 8.dp
 
     GlassBackground {
         Column(
@@ -309,14 +326,16 @@ fun CollapsingScreen(
                 .fillMaxSize()
                 .statusBarsPadding(),
         ) {
-            Row(
+            Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(lerpDp(84.dp, 56.dp, p))
-                    .padding(start = 14.dp, end = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .height(lerpDp(84.dp, collapsedHeight, p))
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                navigation?.invoke()
+                if (navigation != null) {
+                    Box(Modifier.align(Alignment.CenterStart)) { navigation() }
+                }
                 Text(
                     text = title,
                     color = g.text,
@@ -324,13 +343,15 @@ fun CollapsingScreen(
                     lineHeight = 38.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier
-                        .padding(start = if (navigation != null) 12.dp else 12.dp)
+                        .padding(horizontal = if (navigation != null) 52.dp else 0.dp)
                         .graphicsLayer {
-                            val scale = 1f - 0.38f * p
+                            val scale = 1f - 0.4f * p
                             scaleX = scale
                             scaleY = scale
-                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
+                            alpha = 1f - p
                         },
                 )
             }
