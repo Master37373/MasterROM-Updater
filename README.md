@@ -17,4 +17,6 @@ Local build: `gradle :app:assembleRelease` (Gradle 8.11, JDK 17, Android SDK 35)
 ## Status
 
 Stage 1: project, glass components, start screen with update check.
-Next: parallel mirror download, verification, TWRP install, settings, widget.
+Stage 2: segmented multi-mirror download (resume, MD5 check, Wi-Fi only, foreground service).
+Hidden test mode: long press on "ROM version" offers the published build even if it is older.
+Next: install through TWRP, kernel updates, widget.

@@ -10,7 +10,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -210,12 +212,27 @@ fun ChipRow(content: @Composable () -> Unit) {
 
 /** Label / value row inside a card, with an optional divider above. */
 @Composable
-fun InfoRow(label: String, value: String, divider: Boolean) {
+@OptIn(ExperimentalFoundationApi::class)
+fun InfoRow(label: String, value: String, divider: Boolean, onLongClick: (() -> Unit)? = null) {
     val g = LocalGlass.current
     Column {
         if (divider) Box(Modifier.fillMaxWidth().height(1.dp).background(g.divider))
         Row(
-            Modifier.fillMaxWidth().padding(vertical = 14.dp),
+            Modifier
+                .fillMaxWidth()
+                .then(
+                    if (onLongClick != null) {
+                        Modifier.combinedClickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {},
+                            onLongClick = onLongClick,
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
+                .padding(vertical = 14.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {

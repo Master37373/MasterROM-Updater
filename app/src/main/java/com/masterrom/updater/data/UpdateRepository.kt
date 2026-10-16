@@ -87,7 +87,7 @@ object UpdateRepository {
                     val t = tag
                     if (text.isNotEmpty() && t != null) {
                         when (section) {
-                            "rom" -> if (t == "url" || t == "part" || t == "link") romUrls += text else rom[t] = text
+                            "rom" -> if (t == "url" || t == "link" || Regex("part\\d*").matches(t)) romUrls += text else rom[t] = text
                             "kernel" -> kernel[t] = text
                         }
                     }

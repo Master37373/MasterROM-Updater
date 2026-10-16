@@ -1,7 +1,14 @@
 package com.masterrom.updater.ui.home
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.StatFs
 import android.text.format.DateUtils
 import android.text.format.Formatter
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -10,6 +17,8 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,22 +26,39 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.masterrom.updater.R
+import com.masterrom.updater.data.DeviceInfo
+import com.masterrom.updater.data.RomUpdate
+import com.masterrom.updater.download.DlError
+import com.masterrom.updater.download.DlState
+import com.masterrom.updater.download.DownloadManager
+import com.masterrom.updater.download.Phase
 import com.masterrom.updater.ui.glass.Chip
 import com.masterrom.updater.ui.glass.ChipRow
 import com.masterrom.updater.ui.glass.GlassBackground
@@ -42,6 +68,7 @@ import com.masterrom.updater.ui.glass.HeroKind
 import com.masterrom.updater.ui.glass.InfoRow
 import com.masterrom.updater.ui.glass.LargeTitle
 import com.masterrom.updater.ui.glass.PrimaryButton
+import com.masterrom.updater.ui.glass.ProgressRing
 import com.masterrom.updater.ui.glass.SecondaryButton
 import com.masterrom.updater.ui.glass.SectionLabel
 import com.masterrom.updater.ui.theme.LocalGlass
@@ -51,9 +78,24 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val device by vm.device.collectAsStateWithLifecycle()
     val lastChecked by vm.lastChecked.collectAsStateWithLifecycle()
-    val g = LocalGlass.current
+    val download by vm.download.collectAsStateWithLifecycle()
+    val wifiOnly by vm.wifiOnly.collectAsStateWithLifecycle()
+    val testMode by vm.testMode.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val unknown = stringResource(R.string.unknown)
+    var confirmCancel by remember { mutableStateOf(false) }
+
+    // Notifications are optional: the download starts whether or not the permission is granted.
+    val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { vm.startDownload() }
+    val startDownload: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            vm.startDownload()
+        }
+    }
 
     GlassBackground {
         Column(
@@ -68,61 +110,77 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
             Spacer(Modifier.height(32.dp))
             LargeTitle(stringResource(R.string.title_software_update))
 
+            // Which card is shown: the check result, or the download once one exists for the offered build.
+            val avail = state as? UpdateState.Available
+            val dlForOffer = avail?.rom != null && download.job?.version == avail.rom.version && download.phase != Phase.IDLE
+            val cardKey: Any = if (dlForOffer) "dl-${download.phase}" else state::class
+
             AnimatedContent(
-                targetState = state,
+                targetState = cardKey,
                 transitionSpec = {
                     (fadeIn(tween(350)) + scaleIn(tween(350), initialScale = 0.96f)) togetherWith fadeOut(tween(200))
                 },
-                contentKey = { it::class },
                 label = "status",
-            ) { s ->
+            ) { key ->
                 GlassCard {
                     Column(
                         Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        when (s) {
-                            UpdateState.Checking -> {
-                                HeroIcon(HeroKind.CHECKING)
-                                Headline(stringResource(R.string.checking))
-                            }
-                            UpdateState.UpToDate -> {
-                                HeroIcon(HeroKind.UP_TO_DATE)
-                                Headline(stringResource(R.string.up_to_date))
-                                Body(
-                                    stringResource(R.string.rom_and_device, "MasterROM " + device.romVersion.ifEmpty { unknown }, device.model) +
-                                        "\n" + lastCheckedText(lastChecked),
-                                )
-                                SecondaryButton(stringResource(R.string.check_now), onClick = vm::check)
-                            }
-                            is UpdateState.Available -> {
-                                HeroIcon(HeroKind.AVAILABLE)
-                                if (s.rom != null) {
-                                    Headline(stringResource(R.string.update_available))
-                                    Text("MasterROM " + s.rom.version, color = g.text, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
-                                    Body(stringResource(R.string.installed_version, device.romVersion.ifEmpty { unknown }))
-                                    ChipRow {
-                                        if (s.rom.size > 0) Chip(Formatter.formatShortFileSize(context, s.rom.size))
-                                        if (s.rom.date.isNotEmpty()) Chip(s.rom.date)
-                                        if (s.rom.cleanFlash) Chip(stringResource(R.string.chip_clean_flash), g.warning)
-                                        else Chip(stringResource(R.string.chip_dirty_flash))
-                                    }
-                                } else if (s.kernel != null) {
-                                    Headline(stringResource(R.string.kernel_update_available))
-                                    Text(s.kernel.version, color = g.text, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                        val s = state
+                        if (key is String && avail?.rom != null) {
+                            DownloadContent(
+                                rom = avail.rom,
+                                dl = download,
+                                onResume = startDownload,
+                                onPause = vm::pauseDownload,
+                                onCancel = { confirmCancel = true },
+                            )
+                        } else {
+                            when (s) {
+                                UpdateState.Checking -> {
+                                    HeroIcon(HeroKind.CHECKING)
+                                    Headline(stringResource(R.string.checking))
                                 }
-                                PrimaryButton(stringResource(R.string.download), onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth())
-                                Body(stringResource(R.string.download_next_stage))
-                            }
-                            is UpdateState.Failed -> {
-                                HeroIcon(HeroKind.ERROR)
-                                Headline(stringResource(R.string.check_failed))
-                                Body(
-                                    if (s.noDevice) stringResource(R.string.error_no_device, s.detail)
-                                    else stringResource(R.string.error_network),
-                                )
-                                SecondaryButton(stringResource(R.string.try_again), onClick = vm::check)
+                                UpdateState.UpToDate -> {
+                                    HeroIcon(HeroKind.UP_TO_DATE)
+                                    Headline(stringResource(R.string.up_to_date))
+                                    Body(
+                                        stringResource(R.string.rom_and_device, "MasterROM " + device.romVersion.ifEmpty { unknown }, device.model) +
+                                            "\n" + lastCheckedText(lastChecked),
+                                    )
+                                    SecondaryButton(stringResource(R.string.check_now), onClick = vm::check)
+                                }
+                                is UpdateState.Available -> {
+                                    HeroIcon(HeroKind.AVAILABLE)
+                                    if (s.rom != null) {
+                                        Headline(stringResource(R.string.update_available))
+                                        Text("MasterROM " + s.rom.version, color = LocalGlass.current.text, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                                        Body(stringResource(R.string.installed_version, device.romVersion.ifEmpty { unknown }))
+                                        ChipRow {
+                                            if (s.rom.size > 0) Chip(Formatter.formatShortFileSize(context, s.rom.size))
+                                            if (s.rom.date.isNotEmpty()) Chip(s.rom.date)
+                                            if (s.rom.cleanFlash) Chip(stringResource(R.string.chip_clean_flash), LocalGlass.current.warning)
+                                            else Chip(stringResource(R.string.chip_dirty_flash))
+                                        }
+                                        if (testMode) Chip(stringResource(R.string.chip_test), LocalGlass.current.warning)
+                                        Spacer(Modifier.height(4.dp))
+                                        PrimaryButton(stringResource(R.string.download), onClick = startDownload, modifier = Modifier.fillMaxWidth())
+                                    } else if (s.kernel != null) {
+                                        Headline(stringResource(R.string.kernel_update_available))
+                                        Text(s.kernel.version, color = LocalGlass.current.text, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                                    }
+                                }
+                                is UpdateState.Failed -> {
+                                    HeroIcon(HeroKind.ERROR)
+                                    Headline(stringResource(R.string.check_failed))
+                                    Body(
+                                        if (s.noDevice) stringResource(R.string.error_no_device, s.detail)
+                                        else stringResource(R.string.error_network),
+                                    )
+                                    SecondaryButton(stringResource(R.string.try_again), onClick = vm::check)
+                                }
                             }
                         }
                     }
@@ -130,14 +188,193 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
             }
 
             SectionLabel(stringResource(R.string.section_device))
-            GlassCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 22.dp, vertical = 6.dp)) {
-                InfoRow(stringResource(R.string.row_rom_version), device.romVersion.ifEmpty { unknown }, divider = false)
-                InfoRow(stringResource(R.string.row_kernel), com.masterrom.updater.data.DeviceInfo.shortKernel(device.kernel).ifEmpty { unknown }, divider = true)
+            GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 6.dp)) {
+                InfoRow(
+                    stringResource(R.string.row_rom_version),
+                    device.romVersion.ifEmpty { unknown },
+                    divider = false,
+                    onLongClick = {
+                        val on = vm.toggleTestMode()
+                        Toast.makeText(context, if (on) R.string.test_mode_on else R.string.test_mode_off, Toast.LENGTH_LONG).show()
+                    },
+                )
+                InfoRow(stringResource(R.string.row_kernel), DeviceInfo.shortKernel(device.kernel).ifEmpty { unknown }, divider = true)
                 InfoRow(stringResource(R.string.row_device), device.model + if (device.codename.isNotEmpty()) " (${device.codename})" else "", divider = true)
+            }
+
+            SectionLabel(stringResource(R.string.section_settings))
+            GlassCard(padding = PaddingValues(horizontal = 22.dp, vertical = 14.dp)) {
+                SwitchRow(
+                    title = stringResource(R.string.wifi_only),
+                    summary = stringResource(R.string.wifi_only_desc),
+                    checked = wifiOnly,
+                    onChange = vm::setWifiOnly,
+                )
             }
             Spacer(Modifier.height(24.dp))
         }
     }
+
+    if (confirmCancel) {
+        AlertDialog(
+            onDismissRequest = { confirmCancel = false },
+            title = { Text(stringResource(R.string.cancel_title)) },
+            text = { Text(stringResource(R.string.cancel_text)) },
+            confirmButton = {
+                TextButton(onClick = { confirmCancel = false; vm.cancelDownload() }) {
+                    Text(stringResource(R.string.cancel_yes), color = LocalGlass.current.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmCancel = false }) { Text(stringResource(R.string.cancel_no)) }
+            },
+            shape = RoundedCornerShape(28.dp),
+        )
+    }
+}
+
+/** Card content for a download in any phase (searching servers, running, paused, verifying, done, failed). */
+@Composable
+private fun DownloadContent(
+    rom: RomUpdate,
+    dl: DlState,
+    onResume: () -> Unit,
+    onPause: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val g = LocalGlass.current
+    val context = LocalContext.current
+    val sizeOf = { b: Long -> Formatter.formatShortFileSize(context, b) }
+    val progressText = stringResource(R.string.progress_of, sizeOf(dl.done), sizeOf(dl.total))
+
+    when (dl.phase) {
+        Phase.PREPARING -> {
+            ProgressRing(-1f)
+            Headline(stringResource(R.string.searching_servers))
+            Body("MasterROM ${rom.version} · ${sizeOf(rom.size)}")
+            SecondaryButton(stringResource(R.string.cancel), onClick = onCancel)
+        }
+        Phase.RUNNING -> {
+            ProgressRing(dl.progress, caption = stringResource(R.string.downloading))
+            Headline("MasterROM ${rom.version}")
+            Body(progressText)
+            ChipRow {
+                Chip(stringResource(R.string.speed, sizeOf(dl.speed)))
+                etaText(dl.etaSeconds)?.let { Chip(it) }
+                if (dl.mirrors > 0) Chip(stringResource(R.string.servers, dl.mirrors))
+            }
+            Spacer(Modifier.height(4.dp))
+            ButtonPair(
+                secondary = stringResource(R.string.cancel), onSecondary = onCancel,
+                primary = stringResource(R.string.pause), onPrimary = onPause, primaryIsGlass = true,
+            )
+        }
+        Phase.PAUSED -> {
+            ProgressRing(dl.progress, caption = stringResource(R.string.paused), active = false)
+            Headline(stringResource(if (dl.error == DlError.WIFI_REQUIRED) R.string.waiting_wifi else R.string.paused))
+            Body(
+                when (dl.error) {
+                    DlError.WIFI_REQUIRED -> stringResource(R.string.waiting_wifi_text)
+                    DlError.TIME_LIMIT -> stringResource(R.string.time_limit_text)
+                    else -> "MasterROM ${rom.version} · $progressText"
+                },
+            )
+            Spacer(Modifier.height(4.dp))
+            ButtonPair(
+                secondary = stringResource(R.string.cancel), onSecondary = onCancel,
+                primary = stringResource(R.string.resume), onPrimary = onResume,
+            )
+        }
+        Phase.VERIFYING -> {
+            ProgressRing(dl.verify, caption = "MD5")
+            Headline(stringResource(R.string.verifying))
+            Body(stringResource(R.string.verifying_text))
+        }
+        Phase.DONE -> {
+            HeroIcon(HeroKind.UP_TO_DATE)
+            Headline(stringResource(R.string.download_done))
+            Body(stringResource(R.string.download_done_text, rom.version))
+            ChipRow {
+                Chip(sizeOf(rom.size))
+                Chip("MD5 ✓", g.success)
+            }
+            SecondaryButton(stringResource(R.string.delete_download), onClick = onCancel)
+        }
+        Phase.FAILED -> {
+            HeroIcon(HeroKind.ERROR)
+            Headline(stringResource(R.string.download_failed))
+            Body(
+                when (dl.error) {
+                    DlError.NO_MIRROR -> stringResource(R.string.err_no_mirror)
+                    DlError.NO_SPACE -> stringResource(R.string.err_no_space, sizeOf(missingSpace(context, dl)))
+                    DlError.CHECKSUM -> stringResource(R.string.err_checksum)
+                    DlError.STORAGE -> stringResource(R.string.err_storage)
+                    else -> stringResource(R.string.err_network)
+                },
+            )
+            Spacer(Modifier.height(4.dp))
+            ButtonPair(
+                secondary = stringResource(R.string.cancel), onSecondary = onCancel,
+                primary = stringResource(R.string.try_again), onPrimary = onResume,
+            )
+        }
+        Phase.IDLE -> Unit
+    }
+}
+
+@Composable
+private fun ButtonPair(
+    secondary: String,
+    onSecondary: () -> Unit,
+    primary: String,
+    onPrimary: () -> Unit,
+    primaryIsGlass: Boolean = false,
+) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        SecondaryButton(secondary, onClick = onSecondary, modifier = Modifier.weight(1f), height = 52.dp)
+        if (primaryIsGlass) {
+            SecondaryButton(primary, onClick = onPrimary, modifier = Modifier.weight(1f), height = 52.dp)
+        } else {
+            PrimaryButton(primary, onClick = onPrimary, modifier = Modifier.weight(1f), height = 52.dp)
+        }
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, summary: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    val g = LocalGlass.current
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = g.text, fontSize = 16.sp)
+            Text(summary, color = g.subText, fontSize = 13.sp)
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = g.accent,
+                checkedBorderColor = g.accent,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = g.subText.copy(alpha = 0.35f),
+                uncheckedBorderColor = Color.Transparent,
+            ),
+        )
+    }
+}
+
+private fun missingSpace(context: android.content.Context, dl: DlState): Long {
+    val free = StatFs(DownloadManager.dir(context).path).availableBytes
+    return (dl.total - dl.done + 512L * 1024 * 1024 - free).coerceAtLeast(0)
+}
+
+@Composable
+private fun etaText(seconds: Long): String? = when {
+    seconds < 0 -> null
+    seconds < 60 -> stringResource(R.string.eta_less_min)
+    seconds < 3600 -> stringResource(R.string.eta_min, (seconds / 60).toInt() + 1)
+    else -> stringResource(R.string.eta_hours, (seconds / 3600).toInt(), ((seconds % 3600) / 60).toInt())
 }
 
 @Composable

@@ -8,7 +8,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 
 /** Colours of the One UI 8.5 "glass" look (see the design canvas). */
 @Immutable
@@ -84,6 +87,16 @@ fun MasterTheme(content: @Composable () -> Unit) {
         lightColorScheme(primary = glass.accent, background = glass.base, surface = glass.base, onBackground = glass.text, onSurface = glass.text)
     }
     CompositionLocalProvider(LocalGlass provides glass) {
-        MaterialTheme(colorScheme = scheme, content = content)
+        MaterialTheme(colorScheme = scheme) {
+            ProvideTextStyle(LocalTextStyle.current.copy(fontFamily = SystemFont), content = content)
+        }
     }
+}
+
+/**
+ * One UI system font. Compose falls back to Roboto by default; Samsung's font family is
+ * registered as "sec" (it follows the font chosen in the display settings).
+ */
+private val SystemFont: FontFamily by lazy {
+    FontFamily(android.graphics.Typeface.create("sec", android.graphics.Typeface.NORMAL))
 }
