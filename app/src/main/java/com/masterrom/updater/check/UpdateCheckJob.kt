@@ -98,7 +98,9 @@ class UpdateCheckJob : JobService() {
             val info = UpdateRepository.fetch(codename)
             val installed = DeviceInfo.romVersion
             val fromArtisan = DeviceInfo.prop("ro.masterrom.version").isEmpty()
-            val rom = info.rom?.takeIf { fromArtisan || compareVersions(it.version, installed) > 0 }
+            val rom = info.rom?.takeIf {
+                (fromArtisan && it.filename.startsWith("MasterROM")) || (!fromArtisan && compareVersions(it.version, installed) > 0)
+            }
             if (rom == null) {
                 val k = info.kernel?.takeIf {
                     it.link.isNotEmpty() && com.masterrom.updater.data.KernelVersion.isNewer(it.version, DeviceInfo.kernel)

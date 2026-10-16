@@ -108,7 +108,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 // A phone still on ArtisanROM (no ro.masterrom.version) gets the first MasterROM
                 // release offered although its number (1.0.0) is lower than ArtisanROM's 4.0.x.
                 val fromArtisan = DeviceInfo.prop("ro.masterrom.version").isEmpty()
-                val rom = info.rom?.takeIf { _testMode.value || fromArtisan || compareVersions(it.version, d.romVersion) > 0 }
+                val rom = info.rom?.takeIf {
+                    _testMode.value || (fromArtisan && it.filename.startsWith("MasterROM")) ||
+                        (!fromArtisan && compareVersions(it.version, d.romVersion) > 0)
+                }
                 rom?.let { withContext(Dispatchers.IO) { DownloadManager.restore(getApplication<Application>(), DownloadJob.from(it)) } }
                 rom?.let { r -> viewModelScope.launch { _changelog.value = com.masterrom.updater.data.Changelog.forVersion(r.version) } }
                 // A ROM update brings its own kernel, so a kernel update is only offered on its own.
