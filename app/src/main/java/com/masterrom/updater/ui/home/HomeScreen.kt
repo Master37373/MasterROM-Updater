@@ -61,6 +61,7 @@ import com.masterrom.updater.download.DlError
 import com.masterrom.updater.download.DlState
 import com.masterrom.updater.download.DownloadManager
 import com.masterrom.updater.download.Phase
+import com.masterrom.updater.install.Installer
 import com.masterrom.updater.ui.glass.Chip
 import com.masterrom.updater.ui.glass.ChipRow
 import com.masterrom.updater.ui.glass.CollapsingScreen
@@ -87,6 +88,8 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
     val context = LocalContext.current
     val unknown = stringResource(R.string.unknown)
     var confirmCancel by remember { mutableStateOf(false) }
+    var confirmInstall by remember { mutableStateOf(false) }
+    val installState by vm.install.collectAsStateWithLifecycle()
 
     // Notifications are optional: the download starts whether or not the permission is granted.
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { vm.startDownload() }
@@ -129,6 +132,8 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
                                 onResume = startDownload,
                                 onPause = vm::pauseDownload,
                                 onCancel = { confirmCancel = true },
+                                install = installState,
+                                onInstall = { confirmInstall = true },
                             )
                         } else {
                             when (s) {
@@ -202,6 +207,36 @@ fun HomeScreen(vm: HomeViewModel = viewModel(), onOpenSettings: () -> Unit = {})
 
     }
 
+    if (confirmInstall) {
+        val rom = (state as? UpdateState.Available)?.rom
+        val battery = remember { batteryLevel(context) }
+        val lowBattery = battery.first < 30 && !battery.second
+        AlertDialog(
+            onDismissRequest = { confirmInstall = false },
+            title = { Text(stringResource(R.string.install_title, rom?.version.orEmpty())) },
+            text = {
+                Text(
+                    when {
+                        lowBattery -> stringResource(R.string.install_battery_low, battery.first)
+                        rom?.cleanFlash == true -> stringResource(R.string.install_text) + "\n\n" + stringResource(R.string.install_clean_warning)
+                        else -> stringResource(R.string.install_text)
+                    },
+                )
+            },
+            confirmButton = {
+                if (!lowBattery) {
+                    TextButton(onClick = { confirmInstall = false; vm.installNow() }) {
+                        Text(stringResource(R.string.install_confirm))
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmInstall = false }) { Text(stringResource(R.string.cancel_no)) }
+            },
+            shape = RoundedCornerShape(28.dp),
+        )
+    }
+
     if (confirmCancel) {
         AlertDialog(
             onDismissRequest = { confirmCancel = false },
@@ -228,6 +263,8 @@ private fun DownloadContent(
     onResume: () -> Unit,
     onPause: () -> Unit,
     onCancel: () -> Unit,
+    install: InstallState,
+    onInstall: () -> Unit,
 ) {
     val g = LocalGlass.current
     val context = LocalContext.current
@@ -277,15 +314,41 @@ private fun DownloadContent(
             Headline(stringResource(R.string.verifying))
             Body(stringResource(R.string.verifying_text))
         }
-        Phase.DONE -> {
+        Phase.DONE -> if (install == InstallState.Preparing) {
+            ProgressRing(-1f)
+            Headline(stringResource(R.string.install_preparing))
+            Body(stringResource(R.string.install_preparing_text))
+        } else {
             HeroIcon(HeroKind.UP_TO_DATE)
             Headline(stringResource(R.string.download_done))
             Body(stringResource(R.string.download_done_text, rom.version))
             ChipRow {
                 Chip(sizeOf(rom.size))
                 Chip("MD5 ✓", g.success)
+                if (rom.cleanFlash) Chip(stringResource(R.string.chip_clean_flash), g.warning)
             }
-            SecondaryButton(stringResource(R.string.delete_download), onClick = onCancel)
+            if (install is InstallState.Failed) {
+                Text(
+                    stringResource(
+                        when (install.reason) {
+                            Installer.Reason.NO_ROOT -> R.string.err_no_root
+                            Installer.Reason.MOVE_FAILED -> R.string.err_move
+                            Installer.Reason.SCRIPT_FAILED -> R.string.err_script
+                            Installer.Reason.REBOOT_FAILED -> R.string.err_reboot
+                            Installer.Reason.SYSTEM_FAILED -> R.string.err_system
+                        },
+                    ),
+                    color = g.error,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            ButtonPair(
+                secondary = stringResource(R.string.delete), onSecondary = onCancel,
+                primary = stringResource(R.string.install_now), onPrimary = onInstall,
+            )
         }
         Phase.FAILED -> {
             HeroIcon(HeroKind.ERROR)
@@ -349,6 +412,12 @@ internal fun SwitchRow(title: String, summary: String, checked: Boolean, onChang
             ),
         )
     }
+}
+
+/** Battery level in percent and whether the phone is charging. */
+private fun batteryLevel(context: android.content.Context): Pair<Int, Boolean> {
+    val bm = context.getSystemService(android.os.BatteryManager::class.java)
+    return bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) to bm.isCharging
 }
 
 private fun missingSpace(context: android.content.Context, dl: DlState): Long {

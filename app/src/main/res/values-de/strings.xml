@@ -47,7 +47,7 @@
     <string name="verifying">Download wird geprüft…</string>
     <string name="verifying_text">Es wird geprüft, ob die Datei vollständig und unbeschädigt ist.</string>
     <string name="download_done">Bereit zur Installation</string>
-    <string name="download_done_text">MasterROM %1$s wurde heruntergeladen und geprüft. Das Installieren kommt mit der nächsten App-Version.</string>
+    <string name="download_done_text">MasterROM %1$s wurde heruntergeladen und geprüft. Tippe auf „Jetzt installieren“.</string>
     <string name="delete_download">Download löschen</string>
     <string name="download_failed">Download fehlgeschlagen</string>
     <string name="err_network">Die Verbindung wurde unterbrochen. Der Fortschritt bleibt erhalten.</string>
@@ -83,4 +83,17 @@
         <item quantity="one">Noch %d Tippen bis zu den Entwickleroptionen.</item>
         <item quantity="other">Noch %d Mal tippen bis zu den Entwickleroptionen.</item>
     </plurals>
+    <string name="install_now">Jetzt installieren</string>
+    <string name="install_title">MasterROM %1$s installieren?</string>
+    <string name="install_text">Das Handy startet in TWRP neu, installiert das Update und startet danach von selbst wieder. Das dauert etwa 10 Minuten. Apps und Daten bleiben erhalten.</string>
+    <string name="install_clean_warning">Dieser Build braucht Format Data. TWRP macht das nicht automatisch: Sichere deine Daten und formatiere in TWRP, bevor du installierst.</string>
+    <string name="install_battery_low">Der Akku hat %1$d%%. Lade ihn auf mindestens 30%% oder schließe das Ladegerät an, bevor du installierst.</string>
+    <string name="install_confirm">Neu starten und installieren</string>
+    <string name="install_preparing">Installation wird vorbereitet…</string>
+    <string name="install_preparing_text">Das Update wird für TWRP bereitgelegt. Das Handy startet gleich neu.</string>
+    <string name="err_no_root">Root-Zugriff fehlt. Ohne Root muss der Updater eine System-App sein: Ab dem nächsten MasterROM-Build ist er fest eingebaut.</string>
+    <string name="err_move">Das Update konnte nicht für TWRP bereitgelegt werden.</string>
+    <string name="err_script">Das Recovery-Skript konnte nicht geschrieben werden.</string>
+    <string name="err_reboot">Das Handy konnte nicht in die Recovery neu starten. Starte TWRP von Hand und installiere /data/media/TWRP/ota_update.zip.</string>
+    <string name="err_system">Das System konnte die Installation nicht starten.</string>
 </resources>

@@ -13,6 +13,7 @@ import com.masterrom.updater.data.compareVersions
 import com.masterrom.updater.download.DlState
 import com.masterrom.updater.download.DownloadJob
 import com.masterrom.updater.download.DownloadManager
+import com.masterrom.updater.install.Installer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +21,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+sealed interface InstallState {
+    data object Idle : InstallState
+    data object Preparing : InstallState
+    data class Failed(val reason: Installer.Reason) : InstallState
+}
 
 data class DeviceState(val romVersion: String, val kernel: String, val model: String, val codename: String)
 
@@ -55,6 +62,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _device.value = withContext(Dispatchers.IO) {
                 DeviceState(DeviceInfo.romVersion, DeviceInfo.kernel, DeviceInfo.model, DeviceInfo.codename)
+            }
+            // the update was installed: remove the leftovers (the boot receiver usually did this already)
+            val staged = Installer.stagedVersion(app)
+            if (staged != null && compareVersions(DeviceInfo.romVersion, staged) >= 0) {
+                withContext(Dispatchers.IO) {
+                    Installer.cleanup()
+                    DownloadManager.deleteFiles(app)
+                }
+                Installer.clearStaged(app)
             }
             check()
         }
@@ -115,6 +131,35 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _testMode.value = on
         prefs.edit().putBoolean(KEY_TEST_MODE, on).apply()
         check()
+    }
+
+    private val _install = MutableStateFlow<InstallState>(InstallState.Idle)
+    val install: StateFlow<InstallState> = _install.asStateFlow()
+
+    /** Moves the verified ZIP into place for TWRP and reboots to recovery. */
+    fun installNow() {
+        val job = DownloadManager.state.value.job ?: return
+        val app = getApplication<Application>()
+        val zip = DownloadManager.file(app, job)
+        viewModelScope.launch {
+            _install.value = InstallState.Preparing
+            Installer.markStaged(app, job.version)
+            try {
+                if (Installer.canInstallWithoutRoot(app, zip)) {
+                    Installer.installWithoutRoot(app, zip)
+                } else {
+                    Installer.installAndReboot(zip)
+                }
+            } catch (e: Installer.InstallException) {
+                Installer.clearStaged(app)
+                if (e.reason == Installer.Reason.SCRIPT_FAILED || e.reason == Installer.Reason.REBOOT_FAILED) Installer.moveBack(zip)
+                _install.value = InstallState.Failed(e.reason)
+            }
+        }
+    }
+
+    fun dismissInstallError() {
+        _install.value = InstallState.Idle
     }
 
     private val _devUnlocked = MutableStateFlow(prefs.getBoolean(KEY_DEV, false))

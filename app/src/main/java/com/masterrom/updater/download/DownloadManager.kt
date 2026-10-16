@@ -52,7 +52,19 @@ object DownloadManager {
         _state.value = transform(_state.value)
     }
 
-    fun dir(context: Context): File = File(context.filesDir, "ota").apply { mkdirs() }
+    /**
+     * Download folder. When the primary storage is the internal one (/data/media/0), the app's
+     * folder there is used: Android's own OTA path (uncrypt) can read it, so the update can be
+     * installed without root. With the SD card as primary storage the private app folder is used.
+     */
+    fun dir(context: Context): File {
+        val primary = context.getSystemService(android.os.storage.StorageManager::class.java).primaryStorageVolume
+        val external = if (primary.isEmulated && primary.uuid == null) context.getExternalFilesDir("ota") else null
+        return (external ?: File(context.filesDir, "ota")).apply { mkdirs() }
+    }
+
+    /** True when downloads land on internal shared storage (needed for installing without root). */
+    fun onInternalStorage(context: Context): Boolean = dir(context).absolutePath.startsWith("/storage/emulated/")
     fun file(context: Context, job: DownloadJob) = File(dir(context), job.filename)
     fun stateFile(context: Context, job: DownloadJob) = File(dir(context), job.filename + ".state")
     fun okMarker(context: Context, job: DownloadJob) = File(dir(context), job.filename + ".ok")
