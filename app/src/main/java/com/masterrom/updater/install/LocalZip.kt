@@ -17,7 +17,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.RandomAccessFile
 import java.security.MessageDigest
-import java.util.zip.ZipFile
 
 /**
  * A ZIP the user picked (ROM, kernel or another TWRP ZIP). It is copied into the update folder,
@@ -126,10 +125,10 @@ object LocalZip {
         var version: String? = null
         var device: String? = null
         try {
-            ZipFile(zip).use { z ->
-                if (z.getEntry("META-INF/com/google/android/update-binary") == null) throw LocalZipException(Reason.NOT_FLASHABLE)
-                z.getEntry("build_info.txt")?.let { e ->
-                    val props = z.getInputStream(e).bufferedReader().readLines()
+            MiniZip(zip).use { z ->
+                if (!z.has("META-INF/com/google/android/update-binary")) throw LocalZipException(Reason.NOT_FLASHABLE)
+                z.text("build_info.txt")?.let { txt ->
+                    val props = txt.lines()
                         .mapNotNull { l -> l.split('=', limit = 2).takeIf { it.size == 2 }?.let { it[0].trim() to it[1].trim() } }
                         .toMap()
                     version = props["version"]?.takeIf { it.isNotEmpty() }
@@ -137,14 +136,13 @@ object LocalZip {
                     if (version != null) kind = Kind.ROM
                 }
                 if (device == null) {
-                    z.getEntry("META-INF/com/android/metadata")?.let { e ->
-                        device = z.getInputStream(e).bufferedReader().readLines()
+                    z.text("META-INF/com/android/metadata")?.let { txt ->
+                        device = txt.lines()
                             .firstOrNull { it.startsWith("pre-device=") }?.substringAfter('=')?.trim()?.takeIf { it.isNotEmpty() }
                     }
                 }
                 if (kind == Kind.OTHER) {
-                    z.getEntry("META-INF/com/google/android/updater-script")?.let { e ->
-                        val script = z.getInputStream(e).bufferedReader().readText()
+                    z.text("META-INF/com/google/android/updater-script")?.let { script ->
                         Regex("""MasterROM kernel ([^"\s)]+)""").find(script)?.let {
                             kind = Kind.KERNEL
                             version = it.groupValues[1]
