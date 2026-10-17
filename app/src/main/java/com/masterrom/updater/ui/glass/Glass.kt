@@ -211,6 +211,8 @@ fun Chip(text: String, color: Color? = null) {
         color = c,
         fontSize = 13.sp,
         fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        softWrap = false,
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
             .background(if (color == null) g.chipBg else c.copy(alpha = 0.14f))
@@ -218,10 +220,13 @@ fun Chip(text: String, color: Color? = null) {
     )
 }
 
+/** Chips side by side; a chip that does not fit moves to the next line instead of being squeezed. */
 @Composable
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 fun ChipRow(content: @Composable () -> Unit) {
-    Row(
+    androidx.compose.foundation.layout.FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.padding(horizontal = 6.dp),
     ) { content() }
 }
