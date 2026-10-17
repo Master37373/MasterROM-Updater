@@ -79,7 +79,12 @@ object PostUpdate {
                         false -> Kind.LOCAL_FAILED
                         null -> Kind.LOCAL_UNKNOWN
                     },
-                    name,
+                    // "MasterROM 1.0.2" / "ArtisanKRNL 4.0.1 · mr0.1" instead of the long file name
+                    when {
+                        kind == LocalZip.Kind.ROM && v.isNotEmpty() -> "MasterROM $v"
+                        kind == LocalZip.Kind.KERNEL && v.isNotEmpty() -> KernelVersion.label(v) ?: v
+                        else -> name
+                    },
                 )
             }
             clearLocal(c)
@@ -100,7 +105,7 @@ object PostUpdate {
     fun label(r: Result): String = when (r.kind) {
         Kind.ROM_OK, Kind.ROM_FAILED -> "MasterROM ${r.version}"
         Kind.KERNEL_OK, Kind.KERNEL_FAILED -> KernelVersion.label(r.version) ?: r.version
-        else -> r.version   // file name of the picked ZIP
+        else -> r.version   // version text of a picked ZIP, or its file name
     }
 
     fun isOk(r: Result) = r.kind == Kind.ROM_OK || r.kind == Kind.KERNEL_OK || r.kind == Kind.LOCAL_OK
